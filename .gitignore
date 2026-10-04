@@ -1,0 +1,51 @@
+# Зависимости и локальный кеш npm
+node_modules/
+.npm/
+
+# Результаты сборки и кеши TypeScript, Vite и ESLint
+dist/
+*.tsbuildinfo
+.vite/
+.vite-temp/
+.eslintcache
+
+# Локальное окружение; безопасные примеры храним в Git
+.env
+.env.*
+!.env.example
+
+# SQLite и служебные файлы; миграции Drizzle храним в Git
+*.db
+*.sqlite
+*.sqlite3
+*.db-*
+*.sqlite-*
+*.sqlite3-*
+
+# Локальные резервные копии, включая архивы внутри этих каталогов
+backup/
+backups/
+*.bak
+*.backup
+
+# Покрытие, отчёты тестов и сессии браузера Playwright
+coverage/
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+playwright/.auth/
+
+# Логи и временные файлы
+logs/
+*.log
+tmp/
+temp/
+
+# Служебные файлы ОС и редакторов
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~
