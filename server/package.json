@@ -9,6 +9,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@js-temporal/polyfill": "0.5.1",
     "better-sqlite3": "13.0.3"
   },
   "devDependencies": {
