@@ -6,7 +6,7 @@
 
 - [x] [001 — Каркас npm workspace](001.md) · Backend
 - [x] [002 — Публичный контракт TypeSpec](002.md) · Backend
-- [ ] [003 — Схема SQLite и миграции](003.md) · Backend
+- [x] [003 — Схема SQLite и миграции](003.md) · Backend
 - [ ] [007 — Чистая логика времени](007.md) · Backend
 - [ ] [017 — Основа интерфейса](017.md) · Frontend
 
