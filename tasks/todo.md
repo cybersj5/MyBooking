@@ -4,7 +4,7 @@
 
 ## Основа и контракт
 
-- [ ] [001 — Каркас npm workspace](001.md) · Backend
+- [x] [001 — Каркас npm workspace](001.md) · Backend
 - [ ] [002 — Публичный контракт TypeSpec](002.md) · Backend
 - [ ] [003 — Схема SQLite и миграции](003.md) · Backend
 - [ ] [007 — Чистая логика времени](007.md) · Backend
