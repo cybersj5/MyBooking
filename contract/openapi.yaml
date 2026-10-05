@@ -1,0 +1,1319 @@
+openapi: 3.1.0
+info:
+  title: MyBooking API
+  version: 0.0.0
+tags: []
+paths:
+  /api/v1/auth/expert/challenges:
+    post:
+      operationId: requestExpertCode
+      description: Проверяются Origin, актуальное согласие и лимиты. Ответ не раскрывает наличие аккаунта.
+      parameters: []
+      responses:
+        '202':
+          description: The request has been accepted for processing, but processing has not yet completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChallengeAccepted'
+        '400':
+          description: The server could not understand the request due to invalid syntax.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '429':
+          description: Client error
+          headers:
+            Retry-After:
+              required: true
+              schema:
+                type: integer
+                format: int32
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '503':
+          description: Service unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailConsentInput'
+  /api/v1/auth/expert/challenges/{challengeId}/verify:
+    post:
+      operationId: verifyExpertCode
+      description: После успешного кода устанавливается HttpOnly SameSite=Lax cookie сессии. Неверный или истёкший код даёт 400 invalid_challenge.
+      parameters:
+        - name: challengeId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          headers:
+            Set-Cookie:
+              required: true
+              description: Устанавливает сессионный cookie mybooking_session с HttpOnly и SameSite=Lax.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpertVerified'
+        '400':
+          description: The server could not understand the request due to invalid syntax.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CodeInput'
+  /api/v1/auth/logout:
+    post:
+      operationId: logout
+      description: Требуются сессия, Origin и CSRF; cookie и сессия отзываются.
+      parameters:
+        - name: X-CSRF-Token
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: 'There is no content to send for this request, but the headers may be useful. '
+          headers:
+            Set-Cookie:
+              required: true
+              description: Удаляет сессионный cookie в браузере.
+              schema:
+                type: string
+        '401':
+          description: Access is unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - ApiKeyAuth: []
+  /api/v1/bookings/{bookingId}:
+    get:
+      operationId: getBooking
+      description: Сессия организатора либо bearer-токен именно этой заявки. Чужая и отсутствующая заявка дают одинаковый 404.
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/BookingDetail'
+                  - $ref: '#/components/schemas/ExpertBookingDetail'
+        '401':
+          description: Access is unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: The server cannot find the requested resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+  /api/v1/bookings/{bookingId}/access-challenges:
+    post:
+      operationId: requestBookingAccess
+      description: Одинаковый ответ для существующей, чужой и отсутствующей заявки; принятие запроса не подтверждает доставку.
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '202':
+          description: The request has been accepted for processing, but processing has not yet completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessRequestAccepted'
+        '400':
+          description: The server could not understand the request due to invalid syntax.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '429':
+          description: Client error
+          headers:
+            Retry-After:
+              required: true
+              schema:
+                type: integer
+                format: int32
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '503':
+          description: Service unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailConsentInput'
+  /api/v1/bookings/{bookingId}/access-challenges/{requestId}/verify:
+    post:
+      operationId: verifyBookingAccess
+      description: Неверный или истёкший код даёт 400 invalid_challenge; прежний токен отзывается после успешной проверки.
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessVerified'
+        '400':
+          description: The server could not understand the request due to invalid syntax.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CodeInput'
+  /api/v1/bookings/{bookingId}/cancel:
+    post:
+      operationId: cancelBooking
+      description: Один из участников в пределах срока своей роли. При cookie-сессии обязательны Origin и X-CSRF-Token; при гостевом bearer-токене CSRF-заголовок не требуется.
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: X-CSRF-Token
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/BookingDetail'
+                  - $ref: '#/components/schemas/ExpertBookingDetail'
+        '401':
+          description: Access is unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: The server cannot find the requested resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: The request conflicts with the current state of the server.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReasonInput'
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+  /api/v1/bookings/{bookingId}/confirm:
+    post:
+      operationId: confirmBooking
+      description: Только организатор; Origin и CSRF. Проверяются срок, состояние и занятость обоих участников.
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: X-CSRF-Token
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpertBookingDetail'
+        '401':
+          description: Access is unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '403':
+          description: Access is forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: The server cannot find the requested resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: The request conflicts with the current state of the server.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - ApiKeyAuth: []
+  /api/v1/bookings/{bookingId}/reject:
+    post:
+      operationId: rejectBooking
+      description: Только организатор; Origin и CSRF.
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: X-CSRF-Token
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpertBookingDetail'
+        '401':
+          description: Access is unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '403':
+          description: Access is forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: The server cannot find the requested resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: The request conflicts with the current state of the server.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReasonInput'
+      security:
+        - ApiKeyAuth: []
+  /api/v1/bookings/{bookingId}/withdraw:
+    post:
+      operationId: withdrawBooking
+      description: Только bearer-токен гостя этой заявки.
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingDetail'
+        '401':
+          description: Access is unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: The server cannot find the requested resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: The request conflicts with the current state of the server.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReasonInput'
+      security:
+        - BearerAuth: []
+  /api/v1/experts/{publicId}/bookings:
+    post:
+      operationId: createBooking
+      description: Гостевое доказательство погашается после успешного создания. Токен доступа отправляется только письмом.
+      parameters:
+        - name: publicId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '201':
+          description: The request has succeeded and a new resource has been created as a result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingCreated'
+        '400':
+          description: The server could not understand the request due to invalid syntax.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: The server cannot find the requested resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: The request conflicts with the current state of the server.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookingCreateInput'
+  /api/v1/experts/{publicId}/guest-challenges:
+    post:
+      operationId: requestGuestCode
+      parameters:
+        - name: publicId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '202':
+          description: The request has been accepted for processing, but processing has not yet completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChallengeAccepted'
+        '400':
+          description: The server could not understand the request due to invalid syntax.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: The server cannot find the requested resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '429':
+          description: Client error
+          headers:
+            Retry-After:
+              required: true
+              schema:
+                type: integer
+                format: int32
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '503':
+          description: Service unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailConsentInput'
+  /api/v1/experts/{publicId}/guest-challenges/{challengeId}/verify:
+    post:
+      operationId: verifyGuestCode
+      description: Неверный или истёкший код даёт 400 invalid_challenge.
+      parameters:
+        - name: publicId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: challengeId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GuestVerified'
+        '400':
+          description: The server could not understand the request due to invalid syntax.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: The server cannot find the requested resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CodeInput'
+  /api/v1/experts/{publicId}/slots:
+    get:
+      operationId: listSlots
+      description: 'Даты заданы в поясе эксперта: from включительно, to исключительно, не более 31 дня. Pending не скрывают слоты.'
+      parameters:
+        - name: publicId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: from
+          in: query
+          required: true
+          schema:
+            $ref: '#/components/schemas/LocalDate'
+          explode: false
+        - name: to
+          in: query
+          required: true
+          schema:
+            $ref: '#/components/schemas/LocalDate'
+          explode: false
+        - name: durationMinutes
+          in: query
+          required: true
+          schema:
+            type: number
+            enum:
+              - 15
+              - 30
+              - 60
+          explode: false
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SlotsResponse'
+        '400':
+          description: The server could not understand the request due to invalid syntax.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: The server cannot find the requested resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /api/v1/me:
+    get:
+      operationId: getMe
+      description: Требуется сессия эксперта; незавершённый профиль может читать себя.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpertProfile'
+        '401':
+          description: Access is unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - ApiKeyAuth: []
+  /api/v1/me/availability:
+    get:
+      operationId: getAvailability
+      description: Только собственное расписание эксперта с завершённым профилем.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Availability'
+        '401':
+          description: Access is unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '403':
+          description: Access is forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - ApiKeyAuth: []
+    put:
+      operationId: updateAvailability
+      description: Сверяются версия preview, предложенное расписание и последствия; требуются сессия, Origin и CSRF.
+      parameters:
+        - name: X-CSRF-Token
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Availability'
+        '400':
+          description: The server could not understand the request due to invalid syntax.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: Access is unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '403':
+          description: Access is forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: The request conflicts with the current state of the server.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AvailabilityUpdate'
+      security:
+        - ApiKeyAuth: []
+  /api/v1/me/availability/preview:
+    post:
+      operationId: previewAvailability
+      description: Требуются сессия, Origin и CSRF; список содержит только будущие собственные записи организатора.
+      parameters:
+        - name: X-CSRF-Token
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AvailabilityPreview'
+        '400':
+          description: The server could not understand the request due to invalid syntax.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: Access is unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '403':
+          description: Access is forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AvailabilityInput'
+      security:
+        - ApiKeyAuth: []
+  /api/v1/me/bookings:
+    get:
+      operationId: listMyBookings
+      description: Только заявки, где эксперт организатор. Сортировка по startAt по возрастанию; from включительно, to исключительно.
+      parameters:
+        - name: from
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/OffsetDateTime'
+          explode: false
+        - name: to
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/OffsetDateTime'
+          explode: false
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - pending
+              - confirmed
+              - rejected
+              - withdrawn
+              - expired
+              - cancelled
+          explode: false
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+          explode: false
+        - name: limit
+          in: query
+          required: false
+          description: По умолчанию 20.
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 50
+            default: 20
+          explode: false
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingList'
+        '400':
+          description: The server could not understand the request due to invalid syntax.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: Access is unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '403':
+          description: Access is forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - ApiKeyAuth: []
+  /api/v1/me/profile:
+    put:
+      operationId: updateProfile
+      description: Требуются сессия, Origin и CSRF; доступно незавершённому профилю.
+      parameters:
+        - name: X-CSRF-Token
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompletedExpertProfile'
+        '400':
+          description: The server could not understand the request due to invalid syntax.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: Access is unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExpertProfileInput'
+      security:
+        - ApiKeyAuth: []
+  /api/v1/privacy:
+    get:
+      operationId: getPrivacy
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrivacyDocument'
+components:
+  schemas:
+    AccessRequestAccepted:
+      type: object
+      required:
+        - requestId
+      properties:
+        requestId:
+          type: string
+    AccessVerified:
+      type: object
+      required:
+        - accessToken
+        - expiresAt
+      properties:
+        accessToken:
+          type: string
+        expiresAt:
+          $ref: '#/components/schemas/OffsetDateTime'
+    AffectedBooking:
+      type: object
+      required:
+        - id
+        - status
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+          enum:
+            - pending
+            - confirmed
+    ApiError:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: Публичный код без раскрытия чужих сведений.
+        message:
+          type: string
+          description: Безопасное описание на русском языке.
+    Availability:
+      type: object
+      required:
+        - timezone
+        - version
+      properties:
+        timezone:
+          type: string
+        version:
+          type: string
+      allOf:
+        - $ref: '#/components/schemas/AvailabilityInput'
+    AvailabilityInput:
+      type: object
+      required:
+        - weeklyIntervals
+        - excludedDates
+      properties:
+        weeklyIntervals:
+          type: array
+          items:
+            $ref: '#/components/schemas/WeeklyInterval'
+        excludedDates:
+          type: array
+          items:
+            $ref: '#/components/schemas/LocalDate'
+    AvailabilityPreview:
+      type: object
+      required:
+        - version
+        - affectedBookings
+      properties:
+        version:
+          type: string
+          description: Версия связана с предложенным расписанием и списком последствий.
+        affectedBookings:
+          type: array
+          items:
+            $ref: '#/components/schemas/AffectedBooking'
+    AvailabilityUpdate:
+      type: object
+      required:
+        - version
+        - confirmAffected
+      properties:
+        version:
+          type: string
+        confirmAffected:
+          type: boolean
+      allOf:
+        - $ref: '#/components/schemas/AvailabilityInput'
+    BookingCreateInput:
+      type: object
+      required:
+        - guestProof
+        - guestName
+        - guestTimezone
+        - startAt
+        - durationMinutes
+        - topic
+      properties:
+        guestProof:
+          type: string
+        guestName:
+          type: string
+        guestTimezone:
+          type: string
+        startAt:
+          $ref: '#/components/schemas/OffsetDateTime'
+        durationMinutes:
+          type: number
+          enum:
+            - 15
+            - 30
+            - 60
+        topic:
+          type: string
+          minLength: 1
+          maxLength: 120
+        description:
+          type: string
+          maxLength: 2000
+      allOf:
+        - $ref: '#/components/schemas/ConsentInput'
+    BookingCreated:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum:
+            - pending
+      allOf:
+        - $ref: '#/components/schemas/BookingDetail'
+    BookingDetail:
+      type: object
+      required:
+        - id
+        - status
+        - startAt
+        - endAt
+        - topic
+        - guestName
+        - guestTimezone
+        - expertName
+        - expertPublicId
+        - completed
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+          enum:
+            - pending
+            - confirmed
+            - rejected
+            - withdrawn
+            - expired
+            - cancelled
+        startAt:
+          $ref: '#/components/schemas/OffsetDateTime'
+        endAt:
+          $ref: '#/components/schemas/OffsetDateTime'
+        topic:
+          type: string
+        description:
+          type: string
+        guestName:
+          type: string
+        guestTimezone:
+          type: string
+        expertName:
+          type: string
+        expertPublicId:
+          type: string
+        closedReason:
+          type: string
+          enum:
+            - manual
+            - conflict
+            - schedule_changed
+            - deadline
+        completed:
+          type: boolean
+    BookingList:
+      type: object
+      required:
+        - items
+        - nextCursor
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExpertBookingDetail'
+        nextCursor:
+          anyOf:
+            - type: string
+            - type: 'null'
+    ChallengeAccepted:
+      type: object
+      required:
+        - challengeId
+        - expiresAt
+      properties:
+        challengeId:
+          type: string
+        expiresAt:
+          $ref: '#/components/schemas/OffsetDateTime'
+    CodeInput:
+      type: object
+      required:
+        - code
+      properties:
+        code:
+          type: string
+    CompletedExpertProfile:
+      type: object
+      required:
+        - id
+        - email
+        - name
+        - timezone
+        - publicId
+        - profileComplete
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        timezone:
+          type: string
+        publicId:
+          type: string
+        profileComplete:
+          type: boolean
+          enum:
+            - true
+    ConsentInput:
+      type: object
+      required:
+        - consentVersion
+        - consentAccepted
+      properties:
+        consentVersion:
+          type: string
+        consentAccepted:
+          type: boolean
+          enum:
+            - true
+    EmailConsentInput:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+      allOf:
+        - $ref: '#/components/schemas/ConsentInput'
+    ExpertBookingDetail:
+      type: object
+      required:
+        - guestEmail
+      properties:
+        guestEmail:
+          type: string
+          format: email
+      allOf:
+        - $ref: '#/components/schemas/BookingDetail'
+    ExpertProfile:
+      type: object
+      required:
+        - id
+        - email
+        - name
+        - timezone
+        - publicId
+        - profileComplete
+        - csrfToken
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        name:
+          anyOf:
+            - type: string
+            - type: 'null'
+        timezone:
+          anyOf:
+            - type: string
+            - type: 'null'
+        publicId:
+          type: string
+        profileComplete:
+          type: boolean
+        csrfToken:
+          type: string
+    ExpertProfileInput:
+      type: object
+      required:
+        - name
+        - timezone
+      properties:
+        name:
+          type: string
+        timezone:
+          type: string
+    ExpertVerified:
+      type: object
+      required:
+        - profileComplete
+        - csrfToken
+      properties:
+        profileComplete:
+          type: boolean
+        csrfToken:
+          type: string
+    GuestVerified:
+      type: object
+      required:
+        - guestProof
+        - expiresAt
+      properties:
+        guestProof:
+          type: string
+        expiresAt:
+          $ref: '#/components/schemas/OffsetDateTime'
+    LocalDate:
+      type: string
+      pattern: ^\d{4}-\d{2}-\d{2}$
+    LocalEndTime:
+      type: string
+      pattern: ^(?:(?:[01]\d|2[0-3]):[0-5]\d|24:00)$
+    LocalStartTime:
+      type: string
+      pattern: ^(?:[01]\d|2[0-3]):[0-5]\d$
+    OffsetDateTime:
+      type: string
+      format: date-time
+      description: Момент ISO 8601 с явным смещением; сервер определяет однозначный UTC-момент.
+    PrivacyDocument:
+      type: object
+      required:
+        - consentVersion
+        - summary
+        - document
+        - deletionContact
+        - cookieNotice
+      properties:
+        consentVersion:
+          type: string
+        summary:
+          type: string
+        document:
+          type: string
+          description: Краткий документ обычным текстом без HTML и Markdown.
+        deletionContact:
+          type: string
+          format: email
+          description: Публичный рабочий email для удаления данных.
+        cookieNotice:
+          type: string
+    ReasonInput:
+      type: object
+      properties:
+        reason:
+          type: string
+    Slot:
+      type: object
+      required:
+        - startAt
+      properties:
+        startAt:
+          $ref: '#/components/schemas/OffsetDateTime'
+    SlotsResponse:
+      type: object
+      required:
+        - timezone
+        - slots
+      properties:
+        timezone:
+          type: string
+        slots:
+          type: array
+          items:
+            $ref: '#/components/schemas/Slot'
+    WeeklyInterval:
+      type: object
+      required:
+        - weekday
+        - startLocal
+        - endLocal
+      properties:
+        weekday:
+          type: number
+          enum:
+            - 1
+            - 2
+            - 3
+            - 4
+            - 5
+            - 6
+            - 7
+        startLocal:
+          $ref: '#/components/schemas/LocalStartTime'
+        endLocal:
+          $ref: '#/components/schemas/LocalEndTime'
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: cookie
+      name: mybooking_session
+    BearerAuth:
+      type: http
+      scheme: Bearer
