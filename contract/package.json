@@ -5,6 +5,13 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc -p tsconfig.json",
+    "generate": "tsp compile main.tsp"
+  },
+  "dependencies": {
+    "@typespec/compiler": "1.16.0",
+    "@typespec/http": "1.16.0",
+    "@typespec/openapi": "1.16.0",
+    "@typespec/openapi3": "1.16.0"
   }
 }

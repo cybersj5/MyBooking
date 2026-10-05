@@ -1,6 +1,6 @@
 # Спецификация `identity` — вход и права доступа
 
-Статус: сценарии и документальный HTTP-контракт согласованы владельцем 05.10.2026; TypeSpec и код не начаты. Источник требований — [PDR v1.6](../PDR.md), архитектурные ограничения — [ADR-001](../ADR-001.md) и [ADR-002](../ADR-002.md). Этот документ уточняет сценарии первого модуля и не заменяет PDR.
+Статус: сценарии и документальный HTTP-контракт согласованы владельцем 05.10.2026; публичный TypeSpec подготовлен в задаче 002, серверный код `identity` не начат. Источник требований — [PDR v1.6](../PDR.md), архитектурные ограничения — [ADR-001](../ADR-001.md) и [ADR-002](../ADR-002.md). Этот документ уточняет сценарии первого модуля и не заменяет PDR.
 
 ## Цель и граница
 
@@ -59,16 +59,18 @@
 | Метод и путь | Вход | Успех | Доступ |
 | --- | --- | --- | --- |
 | `POST /api/v1/auth/expert/challenges` | `email`, `consentVersion`, `consentAccepted: true` | `202 {challengeId, expiresAt}`; письмо с кодом отправляется через Gmail | Без сессии; проверка Origin, согласия и лимитов |
-| `POST /api/v1/auth/expert/challenges/{challengeId}/verify` | `code` | `200 {profileComplete, csrfToken}` и сессионный HttpOnly-cookie | Без сессии; код погашается атомарно |
+| `POST /api/v1/auth/expert/challenges/{challengeId}/verify` | `code` | `200 {profileComplete, csrfToken}` и сессионный HttpOnly-cookie `mybooking_session` | Без сессии; код погашается атомарно |
 | `GET /api/v1/me` | — | `200 {id, email, name, timezone, publicId, profileComplete, csrfToken}` | Сессия эксперта; `name` и `timezone` могут быть `null` до завершения профиля |
-| `PUT /api/v1/me/profile` | `name`, `timezone` | `200 {id, email, name, timezone, publicId, profileComplete: true}` | Сессия, Origin и CSRF; доступно незавершённому профилю |
-| `POST /api/v1/auth/logout` | — | `204` и отзыв сессии | Сессия, Origin и CSRF; доступно незавершённому профилю |
+| `PUT /api/v1/me/profile` | `name`, `timezone`; заголовок `X-CSRF-Token` | `200 {id, email, name, timezone, publicId, profileComplete: true}` | Сессия, Origin и CSRF; доступно незавершённому профилю |
+| `POST /api/v1/auth/logout` | Заголовок `X-CSRF-Token` | `204` и отзыв сессии | Сессия, Origin и CSRF; доступно незавершённому профилю |
 | `POST /api/v1/experts/{publicId}/guest-challenges` | `email`, `consentVersion`, `consentAccepted: true` | `202 {challengeId, expiresAt}` | Публично; код связан с этим экспертом |
 | `POST /api/v1/experts/{publicId}/guest-challenges/{challengeId}/verify` | `code` | `200 {guestProof, expiresAt}` | Публично; доказательство — секрет на 10 минут, для одного создания заявки |
 | `POST /api/v1/bookings/{bookingId}/access-challenges` | `email`, `consentVersion`, `consentAccepted: true` | `202 {requestId}` с одинаковой формой для существующей, чужой и отсутствующей заявки | Публично; код уходит только на сохранённый email подходящей заявки |
 | `POST /api/v1/bookings/{bookingId}/access-challenges/{requestId}/verify` | `code` | `200 {accessToken, expiresAt}`; старый токен отозван | Публично; атомарная замена после успешного кода |
 
 `guestProof` передаётся в защищённой команде создания заявки и проверяется вместе с `publicId` эксперта. Доказательство погашается только при успешном создании заявки, чтобы ошибка проверки слота не требовала нового письма. Повтор успешной команды с тем же ключом идемпотентности получает сохранённый результат, даже если доказательство уже погашено; другое тело с тем же ключом даёт конфликт. `accessToken` передаётся как bearer-токен для одной заявки. В письме защищённая ссылка содержит токен во фрагменте URL (`#access=…`): фрагмент не отправляется серверу в HTTP-пути или Referer; интерфейс переносит токен в заголовок. Токены не помещаются в query-параметры.
+
+Для всех изменяющих команд с экспертной cookie-сессией клиент передаёт выданный `csrfToken` в обязательном заголовке `X-CSRF-Token`; сервер также проверяет Origin. Гостевой bearer-токен не заменяет экспертную сессию и не требует CSRF-заголовка.
 
 ### Ошибки и доступ
 
@@ -106,4 +108,4 @@
 
 ## Критерий готовности спецификации
 
-Сценарии, публичный HTTP-контракт и смысловой контракт данных `identity` согласованы. Их TypeSpec-реализация, как любой код MVP, требует отдельного согласия владельца.
+Сценарии, публичный HTTP-контракт и смысловой контракт данных `identity` согласованы. TypeSpec реализуется по отдельному разрешению владельца для задачи 002; серверный код требует отдельного разрешения по своим задачам.
