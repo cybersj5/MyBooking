@@ -582,7 +582,8 @@ p {
 @media (max-width: 600px) {
   .guest-section {
     padding: 16px;
-.auth-inline-action {
+  }
+  .auth-inline-action {
   display: inline-flex;
   margin-left: 8px;
   padding: 4px 12px;
@@ -724,4 +725,255 @@ p {
   .cabinet-link-row {
     grid-template-columns: 1fr;
   }
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.schedule-page {
+  display: grid;
+  gap: 16px;
+}
+
+.schedule-form {
+  display: grid;
+  gap: 24px;
+}
+
+.schedule-week,
+.schedule-excluded {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 20px;
+  background: var(--surface);
+  display: grid;
+  gap: 16px;
+}
+
+.schedule-week legend,
+.schedule-excluded legend {
+  font-size: 17px;
+  line-height: 1.35;
+  font-weight: 600;
+  padding: 0 4px;
+}
+
+.schedule-day {
+  display: grid;
+  gap: 8px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+
+.schedule-day:first-of-type {
+  border-top: 0;
+}
+
+.schedule-day h2 {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+.schedule-day-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.schedule-day-list > li {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.schedule-time {
+  display: grid;
+  gap: 4px;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.schedule-time input {
+  font-family: inherit;
+  font-size: 16px;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  min-height: 44px;
+}
+
+.schedule-time input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.schedule-time input:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+  border-color: var(--focus);
+}
+
+.schedule-excluded-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.schedule-excluded-list > li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.schedule-excluded-value {
+  font-variant-numeric: tabular-nums;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.schedule-excluded-add {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.schedule-date {
+  display: grid;
+  gap: 4px;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.schedule-date input {
+  font-family: inherit;
+  font-size: 16px;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  min-height: 44px;
+}
+
+.schedule-date input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.schedule-date input:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+  border-color: var(--focus);
+}
+
+.schedule-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+@media (max-width: 600px) {
+  .schedule-day-list > li {
+    grid-template-columns: 1fr 1fr;
+  }
+  .schedule-day-list > li > button {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+  .schedule-excluded-add {
+    grid-template-columns: 1fr;
+  }
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 27, 30, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 20;
+}
+
+.modal-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 24px;
+  max-width: 560px;
+  width: 100%;
+  display: grid;
+  gap: 16px;
+  box-shadow: 0 16px 32px rgba(17, 27, 30, 0.18);
+}
+
+.modal-card h2 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.3;
+  font-weight: 600;
+}
+
+.modal-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.modal-list > li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--surface-subtle);
+  border-radius: 6px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.modal-list-id {
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.modal-list-status {
+  color: var(--text-muted);
+}
+
+.modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: flex-end;
 }

@@ -105,6 +105,17 @@ export function CabinetHome(): ReactNode {
         </a>
       </section>
 
+      <section className="cabinet-card" aria-label="Расписание">
+        <h2>Расписание</h2>
+        <p className="muted">
+          Недельные интервалы и исключённые даты. Изменения с последствиями требуют
+          подтверждения.
+        </p>
+        <a className="button" href="/cabinet/schedule">
+          Редактировать расписание
+        </a>
+      </section>
+
       <section className="cabinet-card" aria-label="Личная ссылка">
         <h2>Личная ссылка</h2>
         <p className="muted">
@@ -167,7 +178,7 @@ export function CabinetHome(): ReactNode {
       </section>
 
       <p className="muted">
-        Рабочие разделы кабинета (расписание, заявки, встречи) появятся в следующих задачах.
+        Разделы «Заявки», «Календарь» и «История» появятся в следующих задачах.
       </p>
     </div>
   );

@@ -7,6 +7,7 @@ import type { PrivacyDocument } from './api/privacy';
 import { LoginPage } from './auth/LoginPage';
 import { ProfileForm } from './auth/ProfileForm';
 import { CabinetHome } from './auth/CabinetHome';
+import { SchedulePage } from './auth/SchedulePage';
 import { useAuth } from './auth/AuthContext';
 
 type Theme = 'light' | 'dark';
@@ -26,6 +27,7 @@ type Route =
   | { name: 'login' }
   | { name: 'cabinet' }
   | { name: 'profile' }
+  | { name: 'schedule' }
   | { name: 'signedOut' }
   | { name: 'expert'; publicId: string }
   | { name: 'notFound' };
@@ -36,6 +38,7 @@ function getRoute(pathname: string): Route {
   if (path === '/login') return { name: 'login' };
   if (path === '/cabinet') return { name: 'cabinet' };
   if (path === '/cabinet/profile') return { name: 'profile' };
+  if (path === '/cabinet/schedule') return { name: 'schedule' };
   const expertMatch = /^\/experts\/([^/]+)$/.exec(path);
   if (expertMatch && expertMatch[1]) {
     return { name: 'expert', publicId: expertMatch[1] };
@@ -261,6 +264,16 @@ function ProfilePage() {
   );
 }
 
+function ScheduleRoute() {
+  return (
+    <div className="page-content">
+      <CabinetGuard>
+        <SchedulePage />
+      </CabinetGuard>
+    </div>
+  );
+}
+
 export function App() {
   const route = getRoute(window.location.pathname);
 
@@ -280,7 +293,11 @@ export function App() {
                 <a
                   href="/cabinet"
                   aria-current={
-                    route.name === 'cabinet' || route.name === 'profile' ? 'page' : undefined
+                    route.name === 'cabinet' ||
+                    route.name === 'profile' ||
+                    route.name === 'schedule'
+                      ? 'page'
+                      : undefined
                   }
                 >
                   Кабинет
@@ -297,6 +314,7 @@ export function App() {
           {route.name === 'cabinet' && <CabinetPage />}
           {route.name === 'expert' && <PublicExpertPage publicId={route.publicId} />}
           {route.name === 'profile' && <ProfilePage />}
+          {route.name === 'schedule' && <ScheduleRoute />}
           {route.name === 'notFound' && <NotFoundPage />}
         </main>
         <GlobalPrivacySurface />
