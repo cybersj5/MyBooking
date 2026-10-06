@@ -32,6 +32,7 @@ async function createFixture() {
       hmacSecret: 'test-only-hmac-secret',
       allowedOrigin: origin,
       consentVersion: version,
+      deletionContact: 'owner@example.test',
     });
   const app = await createApp(consentVersion);
   const fixture = {

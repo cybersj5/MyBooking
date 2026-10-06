@@ -288,6 +288,8 @@ export function replaceScheduleRows(
     }
     for (const date of excludedDates) insertDate.run(randomUUID(), expertId, date);
   });
+}
+
 export type GuestChallengeRow = ChallengeRow & {
   expertId: string | null;
   bookingId: string | null;

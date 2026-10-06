@@ -25,6 +25,7 @@ async function fixture() {
     hmacSecret: 'test-only-hmac-secret',
     allowedOrigin: origin,
     consentVersion: 'v1',
+    deletionContact: 'owner@example.test',
   });
   fixtures.push({ app, database, directory });
   async function login(email: string, complete: boolean) {
