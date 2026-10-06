@@ -4,6 +4,10 @@ import { CookieNotice } from './cookie-notice/CookieNotice';
 import { ConsentBlock } from './consent/ConsentBlock';
 import { PrivacyGate, usePrivacyDocument } from './usePrivacyDocument';
 import type { PrivacyDocument } from './api/privacy';
+import { LoginPage } from './auth/LoginPage';
+import { ProfileForm } from './auth/ProfileForm';
+import { CabinetHome } from './auth/CabinetHome';
+import { useAuth } from './auth/AuthContext';
 
 type Theme = 'light' | 'dark';
 
@@ -19,14 +23,19 @@ function getInitialTheme(): Theme {
 
 type Route =
   | { name: 'home' }
+  | { name: 'login' }
   | { name: 'cabinet' }
+  | { name: 'profile' }
+  | { name: 'signedOut' }
   | { name: 'expert'; publicId: string }
   | { name: 'notFound' };
 
 function getRoute(pathname: string): Route {
   const path = pathname.replace(/\/+$/, '') || '/';
   if (path === '/') return { name: 'home' };
+  if (path === '/login') return { name: 'login' };
   if (path === '/cabinet') return { name: 'cabinet' };
+  if (path === '/cabinet/profile') return { name: 'profile' };
   const expertMatch = /^\/experts\/([^/]+)$/.exec(path);
   if (expertMatch && expertMatch[1]) {
     return { name: 'expert', publicId: expertMatch[1] };
@@ -34,7 +43,16 @@ function getRoute(pathname: string): Route {
   return { name: 'notFound' };
 }
 
-export function LoadingState({ message = 'Загрузка данных…' }: { message?: string }) {
+function getSignedOutFlag(): boolean {
+  try {
+    const url = new URL(window.location.href);
+    return url.searchParams.get('signed_out') === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function LoadingState({ message = 'Загрузка данных…' }: { message?: string }): ReactNode {
   return (
     <div className="state-panel" role="status" aria-live="polite">
       <span className="loading-line" aria-hidden="true" />
@@ -44,7 +62,13 @@ export function LoadingState({ message = 'Загрузка данных…' }: {
   );
 }
 
-export function ErrorState({ message, action }: { message: string; action?: ReactNode }) {
+export function ErrorState({
+  message,
+  action,
+}: {
+  message: string;
+  action?: ReactNode;
+}): ReactNode {
   return (
     <div className="state-panel state-panel-error" role="alert">
       <strong>Не удалось продолжить</strong>
@@ -116,21 +140,81 @@ function HomePage() {
       <h1>MyBooking</h1>
       <p className="lead">Встречи по удобному расписанию.</p>
       <p>Эксперт делится личной ссылкой. Гость выбирает время и отправляет заявку.</p>
+      <p className="muted">
+        Войти как эксперт:{' '}
+        <a className="button button-secondary auth-inline-action" href="/login">
+          Войти
+        </a>
+      </p>
       <PrivacyGate result={privacy}>
-        {(document) => <ConsentBlock document={document} />}
+        {(document) => (
+          <ConsentBlock
+            document={document}
+            actionLabel="Запросить код"
+            onSubmit={(consent) => {
+              window.location.assign(
+                `/login?email_consent=${encodeURIComponent(consent.consentVersion)}`,
+              );
+            }}
+          />
+        )}
       </PrivacyGate>
     </div>
   );
 }
 
-function CabinetPage() {
+function SignedOutNotice() {
   return (
-    <div className="page-content">
-      <h1>Кабинет эксперта</h1>
-      <p>Здесь будут расписание, заявки и встречи.</p>
-      <p className="muted">Вход и рабочие разделы ещё не подключены.</p>
+    <div className="auth-status auth-status-success" role="status" aria-live="polite">
+      Вы вышли из аккаунта.
     </div>
   );
+}
+
+function CabinetGuard({ children }: { children: ReactNode }): ReactNode {
+  const auth = useAuth();
+  if (auth.status.kind === 'unknown') {
+    return <LoadingState message="Проверяем сессию…" />;
+  }
+  if (auth.status.kind === 'anonymous') {
+    return (
+      <ErrorState
+        message="Сессия истекла. Войдите снова, чтобы открыть личный кабинет."
+        action={
+          <a className="button" href="/login">
+            Войти
+          </a>
+        }
+      />
+    );
+  }
+  if (!auth.status.profile.profileComplete) {
+    if (typeof window !== 'undefined' && window.location.pathname !== '/cabinet/profile') {
+      window.location.assign('/cabinet/profile');
+    }
+    return <LoadingState message="Перенаправляем на заполнение профиля…" />;
+  }
+  return children;
+}
+
+function ProfileGuard({ children }: { children: ReactNode }): ReactNode {
+  const auth = useAuth();
+  if (auth.status.kind === 'unknown') {
+    return <LoadingState message="Загружаем профиль…" />;
+  }
+  if (auth.status.kind === 'anonymous') {
+    return (
+      <ErrorState
+        message="Сессия истекла. Войдите снова."
+        action={
+          <a className="button" href="/login">
+            Войти
+          </a>
+        }
+      />
+    );
+  }
+  return children;
 }
 
 function NotFoundPage() {
@@ -156,6 +240,27 @@ function GlobalPrivacySurface() {
   return <CookieNotice document={privacy.document} />;
 }
 
+function CabinetPage() {
+  return (
+    <div className="page-content">
+      <h1>Кабинет эксперта</h1>
+      <CabinetGuard>
+        <CabinetHome />
+      </CabinetGuard>
+    </div>
+  );
+}
+
+function ProfilePage() {
+  return (
+    <div className="page-content">
+      <ProfileGuard>
+        <ProfileForm />
+      </ProfileGuard>
+    </div>
+  );
+}
+
 export function App() {
   const route = getRoute(window.location.pathname);
 
@@ -172,7 +277,12 @@ export function App() {
             </a>
             <div className="header-actions">
               <nav aria-label="Основная навигация">
-                <a href="/cabinet" aria-current={route.name === 'cabinet' ? 'page' : undefined}>
+                <a
+                  href="/cabinet"
+                  aria-current={
+                    route.name === 'cabinet' || route.name === 'profile' ? 'page' : undefined
+                  }
+                >
                   Кабинет
                 </a>
               </nav>
@@ -181,9 +291,12 @@ export function App() {
           </div>
         </header>
         <main id="main" className="content" tabIndex={-1}>
+          {route.name === 'home' && getSignedOutFlag() ? <SignedOutNotice /> : null}
           {route.name === 'home' && <HomePage />}
+          {route.name === 'login' && <LoginPage />}
           {route.name === 'cabinet' && <CabinetPage />}
           {route.name === 'expert' && <PublicExpertPage publicId={route.publicId} />}
+          {route.name === 'profile' && <ProfilePage />}
           {route.name === 'notFound' && <NotFoundPage />}
         </main>
         <GlobalPrivacySurface />
