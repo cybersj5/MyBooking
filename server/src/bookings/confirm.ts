@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { createExpertAuth } from '../auth/expert-auth.js';
+import type { Broadcaster } from '../updates/broadcaster.js';
 import {
   enqueueJob,
   findBooking,
@@ -61,6 +62,7 @@ export function registerBookingConfirm(
     allowedOrigin: string;
     auth: ReturnType<typeof createExpertAuth>;
     cookieToken: (cookie: string | undefined) => string | undefined;
+    broadcaster?: Broadcaster;
   },
 ) {
   app.post<{ Params: { bookingId: string } }>(
@@ -253,6 +255,12 @@ export function registerBookingConfirm(
         };
       });
       if (result.kind === 'replay' || result.kind === 'confirmed') {
+        if (options.broadcaster) {
+          // Сигнал эксперту и гостю отправляется только после COMMIT, чтобы
+          // не уведомлять о незафиксированном состоянии (PDR §7 UI-06,
+          // инвариант 5 из docs/specs/updates.md).
+          options.broadcaster.notifyBookingChanged(booking.id);
+        }
         return reply.code(result.status).send(result.value);
       }
       return reply

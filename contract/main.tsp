@@ -469,6 +469,30 @@ op withdrawBooking(
   @body input: ReasonInput,
 ): Ok<BookingDetail> | Unauthenticated | NotFound | Conflict;
 
+model SseAvailabilityChangedEvent {
+  type: "availability_changed";
+}
+
+model SseBookingsChangedEvent {
+  type: "bookings_changed";
+  @doc("Для эксперта поле опускается; для гостя содержит идентификатор его заявки.")
+  bookingId?: string;
+}
+
+@route("/api/v1/events")
+@get
+@useAuth(ApiKeyAuth<ApiKeyLocation.cookie, "mybooking_session">)
+@doc("Серверный поток событий о доступности и заявках для авторизованной сессии эксперта. Содержит только тип события; данные перечитываются отдельными командами. Соединение закрывается при отзыве или истечении сессии. Подробности — docs/specs/updates.md.")
+op expertEvents(): void | Unauthenticated;
+
+@route("/api/v1/bookings/{bookingId}/events")
+@get
+@useAuth(BearerAuth)
+@doc("Серверный поток событий для гостя одной заявки. Требуется bearer-токен именно этой заявки; событие содержит её bookingId. Соединение закрывается при отзыве или истечении токена. Подробности — docs/specs/updates.md.")
+op guestEvents(
+  @path bookingId: string,
+): void | Unauthenticated | Forbidden;
+
 @route("/api/v1/bookings/{bookingId}/cancel")
 @post
 @useAuth(BearerAuth | ApiKeyAuth<ApiKeyLocation.cookie, "mybooking_session">)

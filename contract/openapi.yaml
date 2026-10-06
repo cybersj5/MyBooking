@@ -350,6 +350,33 @@ paths:
                 $ref: '#/components/schemas/ApiError'
       security:
         - ApiKeyAuth: []
+  /api/v1/bookings/{bookingId}/events:
+    get:
+      operationId: guestEvents
+      description: Серверный поток событий для гостя одной заявки. Требуется bearer-токен именно этой заявки; событие содержит её bookingId. Соединение закрывается при отзыве или истечении токена. Подробности — docs/specs/updates.md.
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: 'There is no content to send for this request, but the headers may be useful. '
+        '401':
+          description: Access is unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '403':
+          description: Access is forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - BearerAuth: []
   /api/v1/bookings/{bookingId}/reject:
     post:
       operationId: rejectBooking
@@ -457,6 +484,22 @@ paths:
               $ref: '#/components/schemas/ReasonInput'
       security:
         - BearerAuth: []
+  /api/v1/events:
+    get:
+      operationId: expertEvents
+      description: Серверный поток событий о доступности и заявках для авторизованной сессии эксперта. Содержит только тип события; данные перечитываются отдельными командами. Соединение закрывается при отзыве или истечении сессии. Подробности — docs/specs/updates.md.
+      parameters: []
+      responses:
+        '204':
+          description: 'There is no content to send for this request, but the headers may be useful. '
+        '401':
+          description: Access is unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - ApiKeyAuth: []
   /api/v1/experts/{publicId}/bookings:
     post:
       operationId: createBooking
@@ -1312,6 +1355,27 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Slot'
+    SseAvailabilityChangedEvent:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum:
+            - availability_changed
+    SseBookingsChangedEvent:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum:
+            - bookings_changed
+        bookingId:
+          type: string
+          description: Для эксперта поле опускается; для гостя содержит идентификатор его заявки.
     WeeklyInterval:
       type: object
       required:

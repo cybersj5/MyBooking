@@ -483,14 +483,7 @@ export function replaceGuestAccess(
     .prepare(
       'INSERT INTO guest_access (id,bookingId,tokenHash,email,createdAt,expiresAt) VALUES (?,?,?,?,?,?)',
     )
-    .run(
-      access.id,
-      access.bookingId,
-      access.tokenHash,
-      access.email,
-      access.now,
-      access.expiresAt,
-    );
+    .run(access.id, access.bookingId, access.tokenHash, access.email, access.now, access.expiresAt);
 }
 
 export function hasGuestAccess(
@@ -698,7 +691,12 @@ export function findOverduePendingBookings(
     .prepare(
       "SELECT id, startUtc, expertId, guestEmail FROM bookings WHERE status = 'pending' AND startUtc - ? < ?",
     )
-    .all(now, deadlineMs) as { id: string; startUtc: number; expertId: string; guestEmail: string }[];
+    .all(now, deadlineMs) as {
+    id: string;
+    startUtc: number;
+    expertId: string;
+    guestEmail: string;
+  }[];
 }
 
 export function insertBookingTransitionFull(
@@ -785,4 +783,27 @@ export function enqueueJob(
       'pending',
       job.scheduledAt,
     );
+}
+
+// Возвращает true, если сессия с указанным id существует, не отозвана и не
+// истекла. Используется бродкастером SSE для отслеживания отзыва сессии
+// без обращения к HMAC-токену (PDR §7 UI-06, задача 020).
+export function isSessionActive(database: AuthDatabase, sessionId: string, now: number): boolean {
+  const row = database
+    .prepare('SELECT revokedAt, expiresAt FROM expert_sessions WHERE id = ?')
+    .get(sessionId) as { revokedAt: number | null; expiresAt: number } | undefined;
+  return Boolean(row && row.revokedAt === null && row.expiresAt > now);
+}
+
+// Возвращает true, если гостевой токен существует, не отозван и не истёк.
+// Используется бродкастером SSE для отслеживания отзыва токена (UP-07).
+export function isGuestAccessActive(
+  database: AuthDatabase,
+  tokenHash: string,
+  now: number,
+): boolean {
+  const row = database
+    .prepare('SELECT revokedAt, expiresAt FROM guest_access WHERE tokenHash = ?')
+    .get(tokenHash) as { revokedAt: number | null; expiresAt: number } | undefined;
+  return Boolean(row && row.revokedAt === null && row.expiresAt > now);
 }

@@ -3,6 +3,7 @@ import { Temporal } from '@js-temporal/polyfill';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { createGuestAuth } from '../auth/guest-auth.js';
+import type { Broadcaster } from '../updates/broadcaster.js';
 import {
   endAfterDuration,
   isAlignedStart,
@@ -216,6 +217,7 @@ export function registerBookingCreate(
     consentVersion: string;
     allowedOrigin: string;
     guest: ReturnType<typeof createGuestAuth>;
+    broadcaster?: Broadcaster;
   },
 ) {
   app.post<{ Params: { publicId: string } }>(
@@ -384,6 +386,7 @@ export function registerBookingCreate(
         return {
           kind: 'created' as const,
           status: 201 as const,
+          bookingId,
           value: response,
         };
       });
@@ -391,6 +394,12 @@ export function registerBookingCreate(
         return reply.code(result.status).send(result.value);
       }
       if (result.kind === 'created') {
+        // Сигнал эксперту и гостю отправляется только после COMMIT, чтобы
+        // не уведомлять о незафиксированном состоянии (PDR §7 UI-06,
+        // инвариант 5 из docs/specs/updates.md).
+        if (options.broadcaster) {
+          options.broadcaster.notifyBookingChanged(result.bookingId);
+        }
         return reply.code(result.status).send(result.value);
       }
       return reply
