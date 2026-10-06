@@ -251,6 +251,12 @@ model Unauthenticated {
 }
 
 @error
+model Forbidden {
+  @statusCode statusCode: 403;
+  @body body: ApiError;
+}
+
+@error
 model ProfileIncomplete {
   @statusCode statusCode: 403;
   @body body: ApiError;
@@ -287,6 +293,7 @@ model MailUnavailable {
 op requestExpertCode(@body input: EmailConsentInput):
   | Accepted<ChallengeAccepted>
   | BadRequest
+  | Forbidden
   | RateLimited
   | MailUnavailable;
 
@@ -295,7 +302,8 @@ op requestExpertCode(@body input: EmailConsentInput):
 @doc("После успешного кода устанавливается HttpOnly SameSite=Lax cookie сессии. Неверный или истёкший код даёт 400 invalid_challenge.")
 op verifyExpertCode(@path challengeId: string, @body input: CodeInput):
   | ExpertVerifyResponse
-  | BadRequest;
+  | BadRequest
+  | Forbidden;
 
 @route("/api/v1/me")
 @get
@@ -310,13 +318,17 @@ op getMe(): Ok<ExpertProfile> | Unauthenticated;
 op updateProfile(@header("X-CSRF-Token") csrfToken: string, @body input: ExpertProfileInput):
   | Ok<CompletedExpertProfile>
   | BadRequest
+  | Forbidden
   | Unauthenticated;
 
 @route("/api/v1/auth/logout")
 @post
 @useAuth(ApiKeyAuth<ApiKeyLocation.cookie, "mybooking_session">)
 @doc("Требуются сессия, Origin и CSRF; cookie и сессия отзываются.")
-op logout(@header("X-CSRF-Token") csrfToken: string): LogoutResponse | Unauthenticated;
+op logout(@header("X-CSRF-Token") csrfToken: string):
+  | LogoutResponse
+  | Forbidden
+  | Unauthenticated;
 
 @route("/api/v1/experts/{publicId}/guest-challenges")
 @post
