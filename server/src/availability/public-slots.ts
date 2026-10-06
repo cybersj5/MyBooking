@@ -9,7 +9,7 @@ import {
 } from '../time/index.js';
 import type { WeeklyInterval } from '../repository.js';
 
-function whollyWithinLocalInterval(
+function whollyWithinLocalIntervalInternal(
   startAtMs: number,
   endAtMs: number,
   localDate: string,
@@ -35,6 +35,27 @@ function whollyWithinLocalInterval(
     segmentStart = segmentEnd;
   }
   return true;
+}
+
+// Экспортируется для расчёта покрытия бронирований новым расписанием.
+// Целиком ли укладывается UTC-интервал в локальный интервал `firstMinute..lastMinute`
+// на указанной локальной дате в этом поясе (PDR §4.6, TIME-13).
+export function whollyWithinLocalInterval(
+  startAtMs: number,
+  endAtMs: number,
+  localDate: string,
+  firstMinute: number,
+  lastMinute: number,
+  timezone: string,
+): boolean {
+  return whollyWithinLocalIntervalInternal(
+    startAtMs,
+    endAtMs,
+    localDate,
+    firstMinute,
+    lastMinute,
+    timezone,
+  );
 }
 
 export function calculatePublicSlots(input: {
@@ -71,7 +92,7 @@ export function calculatePublicSlots(input: {
             endAtMs: endAfterDuration(instant.epochMilliseconds, input.durationMinutes),
           };
           if (
-            !whollyWithinLocalInterval(
+            !whollyWithinLocalIntervalInternal(
               candidate.startAtMs,
               candidate.endAtMs,
               localDate,

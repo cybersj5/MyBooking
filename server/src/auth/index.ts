@@ -3,6 +3,7 @@ import { Temporal } from '@js-temporal/polyfill';
 import { z } from 'zod';
 import { readAvailability } from '../availability/index.js';
 import { calculatePublicSlots } from '../availability/public-slots.js';
+import { registerAvailabilityUpdate } from '../availability/update.js';
 import {
   findExpertByPublicId,
   readConfirmedBusyIntervals,
@@ -375,6 +376,13 @@ export async function createExpertAuthApp(
     now: options.now,
     allowedOrigin: options.allowedOrigin,
     systemApiKey: options.systemApiKey ?? '',
+  });
+  registerAvailabilityUpdate(app, {
+    database: options.database,
+    now: options.now,
+    allowedOrigin: options.allowedOrigin,
+    auth,
+    cookieToken,
   });
 
   return app;
