@@ -304,6 +304,18 @@ export function findExpertByPublicId(
     .get(publicId) as ExpertRow | undefined;
 }
 
+export function readConfirmedBusyIntervals(
+  database: AuthDatabase,
+  expertId: string,
+  expertEmail: string,
+): { startAtMs: number; endAtMs: number }[] {
+  return database
+    .prepare(
+      "SELECT startUtc AS startAtMs,endUtc AS endAtMs FROM bookings WHERE status = 'confirmed' AND (expertId = ? OR guestEmail = ?)",
+    )
+    .all(expertId, expertEmail) as { startAtMs: number; endAtMs: number }[];
+}
+
 export function guestChallengeLimits(
   database: AuthDatabase,
   email: string,
