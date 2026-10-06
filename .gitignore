@@ -42,6 +42,9 @@ logs/
 tmp/
 temp/
 
+# Сгенерированные промпты координатора; шаблон хранится в tasks/coordinator-prompt.md
+tasks/coordinator-prompts/
+
 # Служебные файлы ОС и редакторов
 .DS_Store
 Thumbs.db
