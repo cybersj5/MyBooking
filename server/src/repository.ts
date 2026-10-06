@@ -288,4 +288,189 @@ export function replaceScheduleRows(
     }
     for (const date of excludedDates) insertDate.run(randomUUID(), expertId, date);
   });
+export type GuestChallengeRow = ChallengeRow & {
+  expertId: string | null;
+  bookingId: string | null;
+};
+
+export function findExpertByPublicId(
+  database: AuthDatabase,
+  publicId: string,
+): ExpertRow | undefined {
+  return database
+    .prepare('SELECT id,email,publicId,name,timezone FROM experts WHERE publicId = ?')
+    .get(publicId) as ExpertRow | undefined;
+}
+
+export function guestChallengeLimits(
+  database: AuthDatabase,
+  email: string,
+  ipHash: string,
+  since: number,
+) {
+  const recentEmail = database
+    .prepare(
+      'SELECT createdAt FROM email_challenges WHERE email = ? ORDER BY createdAt DESC LIMIT 1',
+    )
+    .get(email) as { createdAt: number } | undefined;
+  const emailHour = database
+    .prepare('SELECT COUNT(*) AS count FROM email_challenges WHERE email = ? AND createdAt > ?')
+    .get(email, since) as { count: number };
+  const ipHour = database
+    .prepare(
+      'SELECT COUNT(*) AS count FROM email_challenges WHERE requestIpHash = ? AND createdAt > ?',
+    )
+    .get(ipHash, since) as { count: number };
+  return { recentEmail: recentEmail?.createdAt, emailHour: emailHour.count, ipHour: ipHour.count };
+}
+
+export function replaceGuestChallenges(
+  database: AuthDatabase,
+  purpose: string,
+  email: string,
+  now: number,
+) {
+  database
+    .prepare(
+      'UPDATE email_challenges SET replacedAt = ? WHERE purpose = ? AND email = ? AND consumedAt IS NULL AND replacedAt IS NULL',
+    )
+    .run(now, purpose, email);
+}
+
+export function insertGuestChallenge(
+  database: AuthDatabase,
+  challenge: {
+    id: string;
+    purpose: string;
+    email: string;
+    ipHash: string;
+    codeHash: string;
+    expertId?: string | undefined;
+    bookingId?: string | undefined;
+    now: number;
+    expiresAt: number;
+    consentVersion: string;
+  },
+) {
+  database
+    .prepare(
+      'INSERT INTO email_challenges (id,purpose,email,requestIpHash,expertId,bookingId,codeHash,createdAt,expiresAt,consentVersion,consentAcceptedAt) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+    )
+    .run(
+      challenge.id,
+      challenge.purpose,
+      challenge.email,
+      challenge.ipHash,
+      challenge.expertId ?? null,
+      challenge.bookingId ?? null,
+      challenge.codeHash,
+      challenge.now,
+      challenge.expiresAt,
+      challenge.consentVersion,
+      challenge.now,
+    );
+}
+
+export function getGuestChallenge(
+  database: AuthDatabase,
+  id: string,
+  purpose: string,
+): GuestChallengeRow | undefined {
+  return database
+    .prepare(
+      'SELECT id,email,expertId,bookingId,codeHash,attempts,expiresAt,consumedAt,replacedAt,consentVersion,consentAcceptedAt FROM email_challenges WHERE id = ? AND purpose = ?',
+    )
+    .get(id, purpose) as GuestChallengeRow | undefined;
+}
+
+export function createGuestProof(
+  database: AuthDatabase,
+  proof: {
+    id: string;
+    expertId: string;
+    email: string;
+    tokenHash: string;
+    now: number;
+    expiresAt: number;
+  },
+) {
+  database
+    .prepare(
+      'INSERT INTO guest_proofs (id,expertId,email,tokenHash,createdAt,expiresAt) VALUES (?,?,?,?,?,?)',
+    )
+    .run(proof.id, proof.expertId, proof.email, proof.tokenHash, proof.now, proof.expiresAt);
+}
+
+export function findGuestProof(
+  database: AuthDatabase,
+  tokenHash: string,
+  expertId: string,
+  now: number,
+): { id: string; email: string } | undefined {
+  return database
+    .prepare(
+      'SELECT id,email FROM guest_proofs WHERE tokenHash = ? AND expertId = ? AND consumedAt IS NULL AND expiresAt > ?',
+    )
+    .get(tokenHash, expertId, now) as { id: string; email: string } | undefined;
+}
+
+export function consumeGuestProof(database: AuthDatabase, id: string, now: number) {
+  database
+    .prepare(
+      'UPDATE guest_proofs SET consumedAt = ? WHERE id = ? AND consumedAt IS NULL AND expiresAt > ?',
+    )
+    .run(now, id, now);
+}
+
+export type BookingRow = {
+  id: string;
+  expertId: string;
+  guestEmail: string;
+  guestName: string;
+  guestTimezone: string;
+  startUtc: number;
+  endUtc: number;
+  subject: string;
+  description: string | null;
+  status: string;
+  reason: string | null;
+  expertName: string | null;
+  expertPublicId: string;
+};
+
+export function findBooking(database: AuthDatabase, id: string): BookingRow | undefined {
+  return database
+    .prepare(
+      'SELECT b.id,b.expertId,b.guestEmail,b.guestName,b.guestTimezone,b.startUtc,b.endUtc,b.subject,b.description,b.status,b.reason,e.name AS expertName,e.publicId AS expertPublicId FROM bookings b JOIN experts e ON e.id = b.expertId WHERE b.id = ?',
+    )
+    .get(id) as BookingRow | undefined;
+}
+
+export function replaceGuestAccess(
+  database: AuthDatabase,
+  access: { id: string; bookingId: string; tokenHash: string; now: number; expiresAt: number },
+) {
+  database
+    .prepare('UPDATE guest_access SET revokedAt = ? WHERE bookingId = ? AND revokedAt IS NULL')
+    .run(access.now, access.bookingId);
+  database
+    .prepare(
+      'INSERT INTO guest_access (id,bookingId,tokenHash,createdAt,expiresAt) VALUES (?,?,?,?,?)',
+    )
+    .run(access.id, access.bookingId, access.tokenHash, access.now, access.expiresAt);
+}
+
+export function hasGuestAccess(
+  database: AuthDatabase,
+  bookingId: string,
+  tokenHash: string,
+  now: number,
+): boolean {
+  return Boolean(
+    database
+      .prepare(
+        'SELECT 1 FROM guest_access WHERE bookingId = ? AND tokenHash = ? AND revokedAt IS NULL AND expiresAt > ?',
+      )
+      .get(bookingId, tokenHash, now),
+  );
 }

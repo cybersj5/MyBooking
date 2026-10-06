@@ -1,6 +1,8 @@
 import Fastify from 'fastify';
 import { z } from 'zod';
 import { readAvailability } from '../availability/index.js';
+import { createGuestAuth } from './guest-auth.js';
+import { registerBookingRead } from '../bookings/read.js';
 import {
   createExpertAuth,
   expertSessionMaxAgeSeconds,
@@ -37,6 +39,7 @@ function cookieToken(cookie: string | undefined) {
 export async function createExpertAuthApp(options: ExpertAuthOptions) {
   const app = Fastify({ logger: false, trustProxy: false });
   const auth = createExpertAuth(options);
+  const guest = createGuestAuth(options);
 
   function originAllowed(origin: string | undefined) {
     return origin === options.allowedOrigin;
@@ -139,6 +142,124 @@ export async function createExpertAuthApp(options: ExpertAuthOptions) {
       .header('Set-Cookie', 'mybooking_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0')
       .code(204)
       .send();
+  });
+
+  app.post<{ Params: { publicId: string } }>(
+    '/api/v1/experts/:publicId/guest-challenges',
+    async (request, reply) => {
+      if (!originAllowed(request.headers.origin))
+        return reply.code(403).send(publicError('forbidden', 'Недопустимый источник запроса.'));
+      const parsed = challengeSchema.safeParse(request.body);
+      if (!parsed.success)
+        return reply.code(400).send(publicError('invalid_input', 'Проверьте адрес и согласие.'));
+      const result = await guest.issue(
+        'guest_booking',
+        request.params.publicId,
+        parsed.data.email,
+        parsed.data.consentVersion,
+        request.ip,
+      );
+      if (!result.ok) {
+        if (result.reason === 'consent_outdated')
+          return reply
+            .code(400)
+            .send(publicError('consent_outdated', 'Требуется актуальное согласие.'));
+        if (result.reason === 'rate_limited')
+          return reply
+            .header('Retry-After', '60')
+            .code(429)
+            .send(publicError('rate_limited', 'Повторите запрос позже.'));
+        if (result.reason === 'not_found')
+          return reply.code(404).send(publicError('not_found', 'Не найдено.'));
+        return reply
+          .code(503)
+          .send(publicError('mail_unavailable', 'Сейчас не удалось отправить код.'));
+      }
+      return reply
+        .code(202)
+        .send({ challengeId: result.value.id, expiresAt: result.value.expiresAt });
+    },
+  );
+
+  app.post<{ Params: { publicId: string; challengeId: string } }>(
+    '/api/v1/experts/:publicId/guest-challenges/:challengeId/verify',
+    async (request, reply) => {
+      if (!originAllowed(request.headers.origin))
+        return reply.code(403).send(publicError('forbidden', 'Недопустимый источник запроса.'));
+      const parsed = verifySchema.safeParse(request.body);
+      if (!parsed.success)
+        return reply.code(400).send(publicError('invalid_input', 'Проверьте код.'));
+      const result = guest.verify(
+        'guest_booking',
+        request.params.publicId,
+        request.params.challengeId,
+        parsed.data.code,
+      );
+      if (!result.ok)
+        return reply.code(400).send(publicError('invalid_challenge', 'Код недействителен.'));
+      return reply.send({ guestProof: result.value.token, expiresAt: result.value.expiresAt });
+    },
+  );
+
+  app.post<{ Params: { bookingId: string } }>(
+    '/api/v1/bookings/:bookingId/access-challenges',
+    async (request, reply) => {
+      if (!originAllowed(request.headers.origin))
+        return reply.code(403).send(publicError('forbidden', 'Недопустимый источник запроса.'));
+      const parsed = challengeSchema.safeParse(request.body);
+      if (!parsed.success)
+        return reply.code(400).send(publicError('invalid_input', 'Проверьте адрес и согласие.'));
+      const result = await guest.issue(
+        'booking_access',
+        request.params.bookingId,
+        parsed.data.email,
+        parsed.data.consentVersion,
+        request.ip,
+      );
+      if (!result.ok) {
+        if (result.reason === 'consent_outdated')
+          return reply
+            .code(400)
+            .send(publicError('consent_outdated', 'Требуется актуальное согласие.'));
+        if (result.reason === 'rate_limited')
+          return reply
+            .header('Retry-After', '60')
+            .code(429)
+            .send(publicError('rate_limited', 'Повторите запрос позже.'));
+        return reply
+          .code(503)
+          .send(publicError('mail_unavailable', 'Сейчас не удалось отправить код.'));
+      }
+      return reply.code(202).send({ requestId: result.value.id });
+    },
+  );
+
+  app.post<{ Params: { bookingId: string; requestId: string } }>(
+    '/api/v1/bookings/:bookingId/access-challenges/:requestId/verify',
+    async (request, reply) => {
+      if (!originAllowed(request.headers.origin))
+        return reply.code(403).send(publicError('forbidden', 'Недопустимый источник запроса.'));
+      const parsed = verifySchema.safeParse(request.body);
+      if (!parsed.success)
+        return reply.code(400).send(publicError('invalid_input', 'Проверьте код.'));
+      const result = guest.verify(
+        'booking_access',
+        request.params.bookingId,
+        request.params.requestId,
+        parsed.data.code,
+      );
+      if (!result.ok)
+        return reply.code(400).send(publicError('invalid_challenge', 'Код недействителен.'));
+      return reply.send({ accessToken: result.value.token, expiresAt: result.value.expiresAt });
+    },
+  );
+
+  registerBookingRead(app, {
+    database: options.database,
+    now: options.now,
+    guest,
+    auth,
+    cookieToken,
   });
 
   return app;
