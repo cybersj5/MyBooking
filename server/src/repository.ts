@@ -272,27 +272,39 @@ export function replaceScheduleRows(
   weeklyIntervals: WeeklyInterval[],
   excludedDates: string[],
 ) {
-  immediate(database, () => {
-    if (!findExpertById(database, expertId)) throw new Error('Unknown schedule owner');
-    database.prepare('DELETE FROM availability_intervals WHERE expertId = ?').run(expertId);
-    database.prepare('DELETE FROM excluded_dates WHERE expertId = ?').run(expertId);
-    const insertInterval = database.prepare(
-      'INSERT INTO availability_intervals (id,expertId,weekday,startLocal,endLocal) VALUES (?,?,?,?,?)',
+  immediate(database, () =>
+    replaceScheduleRowsInTransaction(database, expertId, weeklyIntervals, excludedDates),
+  );
+}
+
+// Тот же набор изменений, что и в replaceScheduleRows, но без собственной транзакции.
+// Используется в сценариях, когда удаление и вставка должны попасть во внешнюю
+// транзакцию, открытую вызывающим кодом (PDR §4.6, ADR-001 §2).
+export function replaceScheduleRowsInTransaction(
+  database: AuthDatabase,
+  expertId: string,
+  weeklyIntervals: WeeklyInterval[],
+  excludedDates: string[],
+) {
+  if (!findExpertById(database, expertId)) throw new Error('Unknown schedule owner');
+  database.prepare('DELETE FROM availability_intervals WHERE expertId = ?').run(expertId);
+  database.prepare('DELETE FROM excluded_dates WHERE expertId = ?').run(expertId);
+  const insertInterval = database.prepare(
+    'INSERT INTO availability_intervals (id,expertId,weekday,startLocal,endLocal) VALUES (?,?,?,?,?)',
+  );
+  const insertDate = database.prepare(
+    'INSERT INTO excluded_dates (id,expertId,localDate) VALUES (?,?,?)',
+  );
+  for (const interval of weeklyIntervals) {
+    insertInterval.run(
+      randomUUID(),
+      expertId,
+      interval.weekday,
+      interval.startLocal,
+      interval.endLocal,
     );
-    const insertDate = database.prepare(
-      'INSERT INTO excluded_dates (id,expertId,localDate) VALUES (?,?,?)',
-    );
-    for (const interval of weeklyIntervals) {
-      insertInterval.run(
-        randomUUID(),
-        expertId,
-        interval.weekday,
-        interval.startLocal,
-        interval.endLocal,
-      );
-    }
-    for (const date of excludedDates) insertDate.run(randomUUID(), expertId, date);
-  });
+  }
+  for (const date of excludedDates) insertDate.run(randomUUID(), expertId, date);
 }
 
 export type GuestChallengeRow = ChallengeRow & {
@@ -785,6 +797,26 @@ export function enqueueJob(
     );
 }
 
+// Будущие активные заявки и встречи, где эксперт — организатор.
+// «Будущие» — startUtc > nowMs; «активные» — pending или confirmed.
+// Используется для расчёта affectedBookings (PDR §4.6, ONTOLOGY §5.3).
+export type FutureOrganizerBookingRow = {
+  id: string;
+  status: string;
+  startUtc: number;
+  endUtc: number;
+};
+
+export function findFutureOrganizerBookings(
+  database: AuthDatabase,
+  expertId: string,
+  nowMs: number,
+): FutureOrganizerBookingRow[] {
+  return database
+    .prepare(
+      "SELECT id, status, startUtc, endUtc FROM bookings WHERE expertId = ? AND status IN ('pending','confirmed') AND startUtc > ? ORDER BY startUtc, id",
+    )
+    .all(expertId, nowMs) as FutureOrganizerBookingRow[];
 // Возвращает true, если сессия с указанным id существует, не отозвана и не
 // истекла. Используется бродкастером SSE для отслеживания отзыва сессии
 // без обращения к HMAC-токену (PDR §7 UI-06, задача 020).
