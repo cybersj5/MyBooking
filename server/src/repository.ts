@@ -597,3 +597,110 @@ export function recordBookingConsent(
     )
     .run(record.id, record.bookingId, 'guest_booking_request', record.version, record.now);
 }
+
+export function updateBookingStatusConfirmed(database: AuthDatabase, id: string, now: number) {
+  return database
+    .prepare(
+      "UPDATE bookings SET status = 'confirmed', version = version + 1, updatedAt = ? WHERE id = ? AND status = 'pending'",
+    )
+    .run(now, id).changes;
+}
+
+export function updateBookingStatusRejected(
+  database: AuthDatabase,
+  id: string,
+  reason: string,
+  now: number,
+) {
+  return database
+    .prepare(
+      "UPDATE bookings SET status = 'rejected', reason = ?, version = version + 1, updatedAt = ? WHERE id = ? AND status = 'pending'",
+    )
+    .run(reason, now, id).changes;
+}
+
+export function insertBookingTransitionFull(
+  database: AuthDatabase,
+  transition: {
+    id: string;
+    bookingId: string;
+    fromStatus: string;
+    toStatus: string;
+    reason?: string | null;
+    occurredAt: number;
+  },
+) {
+  database
+    .prepare(
+      'INSERT INTO booking_transitions (id,bookingId,fromStatus,toStatus,reason,occurredAt) VALUES (?,?,?,?,?,?)',
+    )
+    .run(
+      transition.id,
+      transition.bookingId,
+      transition.fromStatus,
+      transition.toStatus,
+      transition.reason ?? null,
+      transition.occurredAt,
+    );
+}
+
+export type OverlappingPendingRow = {
+  id: string;
+  expertId: string;
+  guestEmail: string;
+  startUtc: number;
+  endUtc: number;
+};
+
+export function readOverlappingPendingForParticipants(
+  database: AuthDatabase,
+  expertId: string,
+  guestEmail: string,
+  startUtc: number,
+  endUtc: number,
+  excludeId?: string,
+): OverlappingPendingRow[] {
+  const rows = database
+    .prepare(
+      "SELECT id, expertId, guestEmail, startUtc, endUtc FROM bookings WHERE status = 'pending' AND (expertId = ? OR guestEmail = ?) AND startUtc < ? AND endUtc > ? AND (? IS NULL OR id <> ?) ORDER BY startUtc",
+    )
+    .all(
+      expertId,
+      guestEmail,
+      endUtc,
+      startUtc,
+      excludeId ?? null,
+      excludeId ?? null,
+    ) as OverlappingPendingRow[];
+  return rows;
+}
+
+export function enqueueJob(
+  database: AuthDatabase,
+  job: {
+    id: string;
+    type: string;
+    bookingId: string;
+    eventRef?: string | null;
+    recipient: string;
+    scheduledAt: number;
+    deduplicationKey: string;
+  },
+) {
+  database
+    .prepare(
+      'INSERT INTO jobs (id, deduplicationKey, type, bookingId, eventRef, recipient, scheduledAt, attempts, nextAttemptAt, status, createdAt) VALUES (?,?,?,?,?,?,?,0,?,?,?)',
+    )
+    .run(
+      job.id,
+      job.deduplicationKey,
+      job.type,
+      job.bookingId,
+      job.eventRef ?? null,
+      job.recipient,
+      job.scheduledAt,
+      job.scheduledAt,
+      'pending',
+      job.scheduledAt,
+    );
+}
