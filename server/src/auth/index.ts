@@ -9,6 +9,7 @@ import {
   readScheduleRows,
 } from '../repository.js';
 import { createGuestAuth } from './guest-auth.js';
+import { registerBookingCreate } from '../bookings/create.js';
 import { registerBookingRead } from '../bookings/read.js';
 import { registerPrivacyRoutes, type PrivacyOptions } from '../privacy/index.js';
 import {
@@ -324,6 +325,13 @@ export async function createExpertAuthApp(
     guest,
     auth,
     cookieToken,
+  });
+  registerBookingCreate(app, {
+    database: options.database,
+    now: options.now,
+    consentVersion: options.consentVersion,
+    allowedOrigin: options.allowedOrigin,
+    guest,
   });
 
   return app;

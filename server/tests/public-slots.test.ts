@@ -21,6 +21,7 @@ async function fixture(nowMs = Date.parse('2026-10-05T00:00:00Z')) {
     hmacSecret: 'test-only-hmac-secret',
     allowedOrigin: 'http://localhost:5173',
     consentVersion: 'v1',
+    deletionContact: 'owner@example.test',
   });
   fixtures.push({ app, database, directory });
   database
