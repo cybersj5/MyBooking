@@ -9,7 +9,10 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "better-sqlite3": "13.0.3"
+    "better-sqlite3": "13.0.3",
+    "fastify": "5.12.5",
+    "nodemailer": "10.0.15",
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@types/better-sqlite3": "9.6.0",
