@@ -488,3 +488,112 @@ export function hasGuestAccess(
       .get(bookingId, tokenHash, now),
   );
 }
+
+export type IdempotencyRow = {
+  id: string;
+  scope: string;
+  keyHash: string;
+  bodyHash: string;
+  resultJson: string;
+};
+
+export function findIdempotencyRecord(
+  database: AuthDatabase,
+  scope: string,
+  keyHash: string,
+): IdempotencyRow | undefined {
+  return database
+    .prepare(
+      'SELECT id,scope,keyHash,bodyHash,resultJson FROM idempotency_records WHERE scope = ? AND keyHash = ?',
+    )
+    .get(scope, keyHash) as IdempotencyRow | undefined;
+}
+
+export function insertIdempotencyRecord(
+  database: AuthDatabase,
+  record: {
+    id: string;
+    scope: string;
+    keyHash: string;
+    bodyHash: string;
+    resultJson: string;
+    now: number;
+  },
+) {
+  database
+    .prepare(
+      'INSERT INTO idempotency_records (id,scope,keyHash,bodyHash,resultJson,createdAt) VALUES (?,?,?,?,?,?)',
+    )
+    .run(record.id, record.scope, record.keyHash, record.bodyHash, record.resultJson, record.now);
+}
+
+export type BusyIntervalRow = { startAtMs: number; endAtMs: number };
+
+export function readConfirmedBusyForParticipants(
+  database: AuthDatabase,
+  expertId: string,
+  guestEmail: string,
+): BusyIntervalRow[] {
+  return database
+    .prepare(
+      "SELECT startUtc AS startAtMs,endUtc AS endAtMs FROM bookings WHERE status = 'confirmed' AND (expertId = ? OR guestEmail = ?)",
+    )
+    .all(expertId, guestEmail) as BusyIntervalRow[];
+}
+
+export function insertBooking(
+  database: AuthDatabase,
+  booking: {
+    id: string;
+    expertId: string;
+    guestEmail: string;
+    guestName: string;
+    guestTimezone: string;
+    startUtc: number;
+    endUtc: number;
+    subject: string;
+    description: string | null;
+    now: number;
+  },
+) {
+  database
+    .prepare(
+      'INSERT INTO bookings (id,expertId,guestEmail,guestName,guestTimezone,startUtc,endUtc,subject,description,status,version,createdAt) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
+    )
+    .run(
+      booking.id,
+      booking.expertId,
+      booking.guestEmail,
+      booking.guestName,
+      booking.guestTimezone,
+      booking.startUtc,
+      booking.endUtc,
+      booking.subject,
+      booking.description,
+      'pending',
+      1,
+      booking.now,
+    );
+}
+
+export function insertBookingTransition(
+  database: AuthDatabase,
+  transition: { id: string; bookingId: string; fromStatus: string | null; now: number },
+) {
+  database
+    .prepare(
+      'INSERT INTO booking_transitions (id,bookingId,fromStatus,toStatus,occurredAt) VALUES (?,?,?,?,?)',
+    )
+    .run(transition.id, transition.bookingId, transition.fromStatus, 'pending', transition.now);
+}
+
+export function recordBookingConsent(
+  database: AuthDatabase,
+  record: { id: string; bookingId: string; version: string; now: number },
+) {
+  database
+    .prepare(
+      'INSERT INTO consent_records (id,bookingId,action,documentVersion,accepted,acceptedAt) VALUES (?,?,?,?,1,?)',
+    )
+    .run(record.id, record.bookingId, 'guest_booking_request', record.version, record.now);
+}

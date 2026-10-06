@@ -1,5 +1,9 @@
 import { Component, useEffect, useId, useState, type ReactNode } from 'react';
 import { PublicExpertPage } from './expert/PublicExpertPage';
+import { CookieNotice } from './cookie-notice/CookieNotice';
+import { ConsentBlock } from './consent/ConsentBlock';
+import { PrivacyGate, usePrivacyDocument } from './usePrivacyDocument';
+import type { PrivacyDocument } from './api/privacy';
 
 type Theme = 'light' | 'dark';
 
@@ -106,12 +110,15 @@ function ThemeControl() {
 }
 
 function HomePage() {
+  const privacy = usePrivacyDocument();
   return (
     <div className="page-content">
       <h1>MyBooking</h1>
       <p className="lead">Встречи по удобному расписанию.</p>
       <p>Эксперт делится личной ссылкой. Гость выбирает время и отправляет заявку.</p>
-      <p className="muted">Публичная запись и вход эксперта появятся в следующих задачах.</p>
+      <PrivacyGate result={privacy}>
+        {(document) => <ConsentBlock document={document} />}
+      </PrivacyGate>
     </div>
   );
 }
@@ -140,6 +147,13 @@ function NotFoundPage() {
       />
     </div>
   );
+}
+
+function GlobalPrivacySurface() {
+  const privacy = usePrivacyDocument();
+  if (!privacy) return null;
+  if (!privacy.ok) return null;
+  return <CookieNotice document={privacy.document} />;
 }
 
 export function App() {
@@ -172,7 +186,10 @@ export function App() {
           {route.name === 'expert' && <PublicExpertPage publicId={route.publicId} />}
           {route.name === 'notFound' && <NotFoundPage />}
         </main>
+        <GlobalPrivacySurface />
       </div>
     </AppErrorBoundary>
   );
 }
+
+export type { PrivacyDocument };
