@@ -214,3 +214,155 @@ p {
     padding: 32px 16px;
   }
 }
+
+/* Скрытая визуально, но доступная для скринридера секция. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Публичная страница эксперта. */
+.expert-page {
+  display: grid;
+  gap: 24px;
+}
+.expert-header h1 {
+  margin-bottom: 8px;
+}
+.expert-header .lead {
+  margin: 0;
+  color: var(--text-muted);
+}
+.expert-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  align-items: flex-start;
+}
+.duration-fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px 16px;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.duration-fieldset legend {
+  padding: 0 8px;
+  font-weight: 600;
+}
+.duration-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+}
+.duration-option label {
+  cursor: pointer;
+}
+.timezone-control {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 240px;
+}
+.timezone-control select {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+.expert-timezone {
+  margin: 0;
+}
+.slots-section {
+  display: grid;
+  gap: 16px;
+}
+.slot-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.slot-button {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    'time timezones'
+    'date date'
+    'selected selected';
+  align-items: center;
+  gap: 4px 16px;
+  width: 100%;
+  min-height: 44px;
+  padding: 12px 16px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+.slot-button:hover {
+  background: var(--surface-subtle);
+}
+.slot-button[data-selected='true'] {
+  border-color: var(--accent);
+  background: var(--surface-subtle);
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.slot-time {
+  grid-area: time;
+  font-variant-numeric: tabular-nums;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.slot-timezones {
+  grid-area: timezones;
+  font-size: 14px;
+}
+.slot-date {
+  grid-area: date;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+.slot-selected {
+  grid-area: selected;
+  margin-top: 4px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+@media (max-width: 600px) {
+  .expert-controls {
+    flex-direction: column;
+    gap: 16px;
+  }
+  .timezone-control {
+    min-width: 0;
+    width: 100%;
+  }
+  .slot-button {
+    grid-template-areas:
+      'time timezones'
+      'date date'
+      'selected selected';
+  }
+}
