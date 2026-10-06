@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { createExpertAuth } from '../auth/expert-auth.js';
 import type { createGuestAuth } from '../auth/guest-auth.js';
+import type { Broadcaster } from '../updates/broadcaster.js';
 import {
   enqueueJob,
   findBooking,
@@ -38,10 +39,7 @@ type Failure =
   | 'deadline_exceeded'
   | 'already_started';
 
-function publicError(
-  code: Failure | 'forbidden' | 'unauthenticated',
-  message: string,
-) {
+function publicError(code: Failure | 'forbidden' | 'unauthenticated', message: string) {
   return { code, message };
 }
 
@@ -104,6 +102,7 @@ export function registerBookingCancel(
     auth: ReturnType<typeof createExpertAuth>;
     guest: ReturnType<typeof createGuestAuth>;
     cookieToken: (cookie: string | undefined) => string | undefined;
+    broadcaster?: Broadcaster;
   },
 ) {
   app.post<{ Params: { bookingId: string } }>(
@@ -113,9 +112,7 @@ export function registerBookingCancel(
         return reply.code(403).send(publicError('forbidden', 'Недопустимый источник запроса.'));
       const idempotencyKey = idKey.safeParse(request.headers['idempotency-key']);
       if (!idempotencyKey.success) {
-        return reply
-          .code(400)
-          .send(publicError('invalid_input', 'Укажите ключ идемпотентности.'));
+        return reply.code(400).send(publicError('invalid_input', 'Укажите ключ идемпотентности.'));
       }
       const parsedBody = bodySchema.safeParse(request.body ?? {});
       if (!parsedBody.success) {
@@ -128,9 +125,7 @@ export function registerBookingCancel(
       // Иначе пробуем гостевой токен.
       let actor: Actor;
       let scope: string;
-      const session = options.auth.currentSession(
-        options.cookieToken(request.headers.cookie),
-      );
+      const session = options.auth.currentSession(options.cookieToken(request.headers.cookie));
       if (session && request.headers['x-csrf-token'] === session.csrfToken) {
         actor = { kind: 'expert', expertId: session.expert.id, email: session.expert.email };
         scope = `expert_cancel:${request.params.bookingId}`;
@@ -278,6 +273,10 @@ export function registerBookingCancel(
         };
       });
       if (result.kind === 'replay' || result.kind === 'cancelled') {
+        if (options.broadcaster) {
+          // Сигнал отправляется только после COMMIT.
+          options.broadcaster.notifyBookingChanged(booking.id);
+        }
         return reply.code(result.status).send(result.value);
       }
       if (result.kind === 'not_found') {

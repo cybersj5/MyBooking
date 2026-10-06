@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { createExpertAuth } from '../auth/expert-auth.js';
+import type { Broadcaster } from '../updates/broadcaster.js';
 import {
   enqueueJob,
   findBooking,
@@ -80,6 +81,7 @@ export function registerBookingReject(
     allowedOrigin: string;
     auth: ReturnType<typeof createExpertAuth>;
     cookieToken: (cookie: string | undefined) => string | undefined;
+    broadcaster?: Broadcaster;
   },
 ) {
   app.post<{ Params: { bookingId: string } }>(
@@ -93,9 +95,7 @@ export function registerBookingReject(
         return reply.code(403).send(publicError('forbidden', 'Недопустимый запрос.'));
       const idempotencyKey = idKey.safeParse(request.headers['idempotency-key']);
       if (!idempotencyKey.success) {
-        return reply
-          .code(400)
-          .send(publicError('invalid_input', 'Укажите ключ идемпотентности.'));
+        return reply.code(400).send(publicError('invalid_input', 'Укажите ключ идемпотентности.'));
       }
       const parsedBody = bodySchema.safeParse(request.body ?? {});
       if (!parsedBody.success) {
@@ -181,6 +181,10 @@ export function registerBookingReject(
         };
       });
       if (result.kind === 'replay' || result.kind === 'rejected') {
+        if (options.broadcaster) {
+          // Сигнал отправляется только после COMMIT.
+          options.broadcaster.notifyBookingChanged(booking.id);
+        }
         return reply.code(result.status).send(result.value);
       }
       return reply

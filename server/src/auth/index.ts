@@ -9,6 +9,8 @@ import {
   readConfirmedBusyIntervals,
   readScheduleRows,
 } from '../repository.js';
+import { createBroadcaster } from '../updates/broadcaster.js';
+import { registerUpdatesRoutes } from '../updates/stream.js';
 import { createGuestAuth } from './guest-auth.js';
 import { registerBookingCancel } from '../bookings/cancel.js';
 import { registerBookingConfirm } from '../bookings/confirm.js';
@@ -83,6 +85,9 @@ export async function createExpertAuthApp(
   });
   const auth = createExpertAuth(options);
   const guest = createGuestAuth(options);
+  // Бродкастер живёт в одном процессе с приложением; задача 020 не
+  // масштабируется на несколько инстансов, синхронизация через Redis отложена.
+  const broadcaster = createBroadcaster(options.database, options.now);
 
   function originAllowed(origin: string | undefined) {
     return origin === options.allowedOrigin;
@@ -338,6 +343,7 @@ export async function createExpertAuthApp(
     consentVersion: options.consentVersion,
     allowedOrigin: options.allowedOrigin,
     guest,
+    broadcaster,
   });
   registerBookingConfirm(app, {
     database: options.database,
@@ -345,6 +351,7 @@ export async function createExpertAuthApp(
     allowedOrigin: options.allowedOrigin,
     auth,
     cookieToken,
+    broadcaster,
   });
   registerBookingReject(app, {
     database: options.database,
@@ -352,6 +359,7 @@ export async function createExpertAuthApp(
     allowedOrigin: options.allowedOrigin,
     auth,
     cookieToken,
+    broadcaster,
   });
   registerBookingWithdraw(app, {
     database: options.database,
@@ -361,6 +369,7 @@ export async function createExpertAuthApp(
     guest,
     auth,
     cookieToken,
+    broadcaster,
   });
   registerBookingCancel(app, {
     database: options.database,
@@ -370,12 +379,28 @@ export async function createExpertAuthApp(
     auth,
     guest,
     cookieToken,
+    broadcaster,
   });
   registerBookingExpire(app, {
     database: options.database,
     now: options.now,
     allowedOrigin: options.allowedOrigin,
     systemApiKey: options.systemApiKey ?? '',
+    broadcaster,
+  });
+  registerUpdatesRoutes(app, {
+    database: options.database,
+    auth,
+    guest,
+    broadcaster,
+    hmacSecret: options.hmacSecret,
+    now: options.now,
+  });
+
+  // Останавливаем таймер бродкастера при закрытии приложения, чтобы
+  // процесс не удерживался setInterval в Vitest.
+  app.addHook('onClose', async () => {
+    broadcaster.shutdown();
   });
   registerAvailabilityUpdate(app, {
     database: options.database,

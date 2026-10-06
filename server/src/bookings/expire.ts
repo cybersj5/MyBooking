@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import type { Broadcaster } from '../updates/broadcaster.js';
 import {
   enqueueJob,
   findBooking,
@@ -53,12 +54,13 @@ export function expireBooking(
   database: AuthDatabase,
   bookingId: string,
   now: number,
+  broadcaster?: Broadcaster,
 ):
-  | { kind: 'expired'; response: Record<string, unknown> }
+  | { kind: 'expired'; response: Record<string, unknown>; expertId: string }
   | { kind: 'not_overdue' }
   | { kind: 'status_conflict' }
   | { kind: 'not_found' } {
-  return immediate(database, () => {
+  const result = immediate(database, () => {
     const fresh = findBooking(database, bookingId);
     if (!fresh) return { kind: 'not_found' as const };
     if (fresh.status !== 'pending') return { kind: 'status_conflict' as const };
@@ -83,6 +85,7 @@ export function expireBooking(
     });
     return {
       kind: 'expired' as const,
+      expertId: fresh.expertId,
       response: buildExpireResponse({
         id: fresh.id,
         startUtc: fresh.startUtc,
@@ -93,19 +96,24 @@ export function expireBooking(
       }),
     };
   });
+  // Широковещание строго после COMMIT (PDR §7 UI-06, инвариант 5).
+  if (broadcaster && result.kind === 'expired') {
+    broadcaster.notifyBookingChanged(bookingId);
+  }
+  return result;
 }
 
 // Пакетная обработка просроченных pending. Возвращает количество успешно истёкших заявок.
 export function expireOverdueBookings(
   database: AuthDatabase,
-  options: { now: () => number; deadlineMs?: number },
+  options: { now: () => number; deadlineMs?: number; broadcaster?: Broadcaster },
 ): { expired: number } {
   const deadlineMs = options.deadlineMs ?? EXPIRE_DEADLINE_MS;
   const now = options.now();
   const candidates = findOverduePendingBookings(database, now, deadlineMs);
   let expired = 0;
   for (const row of candidates) {
-    const result = expireBooking(database, row.id, now);
+    const result = expireBooking(database, row.id, now, options.broadcaster);
     if (result.kind === 'expired') expired += 1;
   }
   return { expired };
@@ -118,6 +126,7 @@ export function registerBookingExpire(
     now: () => number;
     allowedOrigin: string;
     systemApiKey: string;
+    broadcaster?: Broadcaster;
   },
 ) {
   app.post<{ Params: { bookingId: string } }>(
@@ -131,17 +140,14 @@ export function registerBookingExpire(
         provided.length === 0 ||
         provided !== options.systemApiKey
       ) {
-        return reply
-          .code(401)
-          .send(publicError('unauthenticated', 'Требуется системный ключ.'));
+        return reply.code(401).send(publicError('unauthenticated', 'Требуется системный ключ.'));
       }
       const parsedBody = bodySchema.safeParse(request.body ?? {});
       if (!parsedBody.success) {
         return reply.code(400).send(publicError('invalid_input', 'Проверьте тело запроса.'));
       }
       const booking = findBooking(options.database, request.params.bookingId);
-      if (!booking)
-        return reply.code(404).send(publicError('not_found', 'Заявка не найдена.'));
+      if (!booking) return reply.code(404).send(publicError('not_found', 'Заявка не найдена.'));
       const nowMs = options.now();
       const result = immediate(options.database, () => {
         // Идемпотентность системного истечения обеспечивается статусом самой заявки:
@@ -209,6 +215,10 @@ export function registerBookingExpire(
         };
       });
       if (result.kind === 'expired') {
+        if (options.broadcaster) {
+          // Сигнал отправляется только после COMMIT.
+          options.broadcaster.notifyBookingChanged(booking.id);
+        }
         return reply.code(result.status).send(result.value);
       }
       if (result.kind === 'not_found') {
