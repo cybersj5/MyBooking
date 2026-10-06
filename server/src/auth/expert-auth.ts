@@ -1,4 +1,5 @@
 import { createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
+import { createGuestAuth } from './guest-auth.js';
 import {
   challengeLimits,
   consumeChallenge,
@@ -68,6 +69,7 @@ function validTimezone(value: string) {
 
 export function createExpertAuth(options: ExpertAuthOptions) {
   const { database, now, hmacSecret, consentVersion } = options;
+  const guest = createGuestAuth(options);
 
   async function requestChallenge(
     email: string,
@@ -200,7 +202,15 @@ export function createExpertAuth(options: ExpertAuthOptions) {
     immediate(database, () => revokeSession(database, sessionId, now()));
   }
 
-  return { requestChallenge, verifyChallenge, currentSession, getProfile, updateProfile, logout };
+  return {
+    requestChallenge,
+    verifyChallenge,
+    currentSession,
+    getProfile,
+    updateProfile,
+    logout,
+    resolveGuestProof: guest.resolveGuestProof,
+  };
 }
 
 export const expertSessionMaxAgeSeconds = sessionLifetime / 1000;
