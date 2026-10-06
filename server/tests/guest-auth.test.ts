@@ -37,6 +37,7 @@ it('proves a guest email for one expert without creating an expert account', asy
     hmacSecret: 'test-only-hmac-secret',
     allowedOrigin: origin,
     consentVersion,
+    deletionContact: 'owner@example.test',
   });
   fixtures.push({ app, database, directory });
 
@@ -107,6 +108,7 @@ it('binds guest proof to one expert and rejects self booking before consuming pr
     hmacSecret: 'test-only-hmac-secret',
     allowedOrigin: origin,
     consentVersion,
+    deletionContact: 'owner@example.test',
   };
   const app = await createExpertAuthApp(options);
   fixtures.push({ app, database, directory });
@@ -156,6 +158,7 @@ it('limits restored access to one booking and rejects its token after expiry', a
     hmacSecret: 'test-only-hmac-secret',
     allowedOrigin: origin,
     consentVersion,
+    deletionContact: 'owner@example.test',
   });
   fixtures.push({ app, database, directory });
   database
@@ -292,6 +295,7 @@ it('denies an incomplete expert access to their booking', async () => {
     hmacSecret: 'test-only-hmac-secret',
     allowedOrigin: origin,
     consentVersion,
+    deletionContact: 'owner@example.test',
   });
   fixtures.push({ app, database, directory });
   const challenge = await app.inject({
@@ -349,6 +353,7 @@ it('creates initial access for one new booking inside its transaction', async ()
     hmacSecret: 'test-only-hmac-secret',
     allowedOrigin: origin,
     consentVersion,
+    deletionContact: 'owner@example.test',
   };
   const app = await createExpertAuthApp(options);
   fixtures.push({ app, database, directory });

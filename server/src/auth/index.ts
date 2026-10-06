@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { readAvailability } from '../availability/index.js';
 import { createGuestAuth } from './guest-auth.js';
 import { registerBookingRead } from '../bookings/read.js';
+import { registerPrivacyRoutes, type PrivacyOptions } from '../privacy/index.js';
 import {
   createExpertAuth,
   expertSessionMaxAgeSeconds,
@@ -36,8 +37,14 @@ function cookieToken(cookie: string | undefined) {
   return part?.slice('mybooking_session='.length);
 }
 
-export async function createExpertAuthApp(options: ExpertAuthOptions) {
+export async function createExpertAuthApp(
+  options: ExpertAuthOptions & Pick<PrivacyOptions, 'deletionContact'>,
+) {
   const app = Fastify({ logger: false, trustProxy: false });
+  registerPrivacyRoutes(app, {
+    consentVersion: options.consentVersion,
+    deletionContact: options.deletionContact,
+  });
   const auth = createExpertAuth(options);
   const guest = createGuestAuth(options);
 
