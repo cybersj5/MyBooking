@@ -33,6 +33,10 @@ export type ExpertAuthOptions = {
   allowedOrigin: string;
   consentVersion: string;
   secureCookies?: boolean;
+  // Ключ для системного обработчика истечения заявок (POST .../expire).
+  // По умолчанию пустой, поэтому маршрут /expire в тестах без явного ключа
+  // всегда отвечает 401.
+  systemApiKey?: string;
 };
 
 export type AuthFailure =

@@ -2,8 +2,9 @@ import Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 import { initialMigration } from './migrations/001_initial.js';
 import { challengeConsentMigration } from './migrations/002_challenge_consent.js';
+import { guestAccessEmailMigration } from './migrations/003_guest_access_email.js';
 
-const schemaVersion = 2;
+const schemaVersion = 3;
 
 export function openDatabase(path: string): Database.Database {
   const database = new Database(path);
@@ -27,6 +28,10 @@ export function openDatabase(path: string): Database.Database {
       if (currentVersion < 2) {
         database.exec(challengeConsentMigration);
         database.pragma('user_version = 2');
+      }
+      if (currentVersion < 3) {
+        database.exec(guestAccessEmailMigration);
+        database.pragma('user_version = 3');
       }
       database.exec('COMMIT');
     } catch (error) {
@@ -462,16 +467,30 @@ export function findBooking(database: AuthDatabase, id: string): BookingRow | un
 
 export function replaceGuestAccess(
   database: AuthDatabase,
-  access: { id: string; bookingId: string; tokenHash: string; now: number; expiresAt: number },
+  access: {
+    id: string;
+    bookingId: string;
+    tokenHash: string;
+    email: string;
+    now: number;
+    expiresAt: number;
+  },
 ) {
   database
     .prepare('UPDATE guest_access SET revokedAt = ? WHERE bookingId = ? AND revokedAt IS NULL')
     .run(access.now, access.bookingId);
   database
     .prepare(
-      'INSERT INTO guest_access (id,bookingId,tokenHash,createdAt,expiresAt) VALUES (?,?,?,?,?)',
+      'INSERT INTO guest_access (id,bookingId,tokenHash,email,createdAt,expiresAt) VALUES (?,?,?,?,?,?)',
     )
-    .run(access.id, access.bookingId, access.tokenHash, access.now, access.expiresAt);
+    .run(
+      access.id,
+      access.bookingId,
+      access.tokenHash,
+      access.email,
+      access.now,
+      access.expiresAt,
+    );
 }
 
 export function hasGuestAccess(
@@ -487,6 +506,23 @@ export function hasGuestAccess(
       )
       .get(bookingId, tokenHash, now),
   );
+}
+
+// Возвращает email, на который был выписан активный токен доступа к заявке.
+// Используется для проверки, что вызов делает именно гость этой заявки, а не
+// обладатель чужого токена, выписанного на ту же заявку.
+export function findGuestAccessEmail(
+  database: AuthDatabase,
+  bookingId: string,
+  tokenHash: string,
+  now: number,
+): string | undefined {
+  const row = database
+    .prepare(
+      'SELECT email FROM guest_access WHERE bookingId = ? AND tokenHash = ? AND revokedAt IS NULL AND expiresAt > ?',
+    )
+    .get(bookingId, tokenHash, now) as { email: string } | undefined;
+  return row?.email;
 }
 
 export type IdempotencyRow = {
@@ -617,6 +653,52 @@ export function updateBookingStatusRejected(
       "UPDATE bookings SET status = 'rejected', reason = ?, version = version + 1, updatedAt = ? WHERE id = ? AND status = 'pending'",
     )
     .run(reason, now, id).changes;
+}
+
+// Переводит заявку в withdrawn без указания причины (PDR §4.4, ONTOLOGY §6).
+export function updateBookingStatusWithdrawn(database: AuthDatabase, id: string, now: number) {
+  return database
+    .prepare(
+      "UPDATE bookings SET status = 'withdrawn', reason = NULL, version = version + 1, updatedAt = ? WHERE id = ? AND status = 'pending'",
+    )
+    .run(now, id).changes;
+}
+
+// Переводит подтверждённую встречу в cancelled, причина необязательна (PDR §4.5, ONTOLOGY §6).
+export function updateBookingStatusCancelled(
+  database: AuthDatabase,
+  id: string,
+  reason: string | null,
+  now: number,
+) {
+  return database
+    .prepare(
+      "UPDATE bookings SET status = 'cancelled', reason = ?, version = version + 1, updatedAt = ? WHERE id = ? AND status = 'confirmed'",
+    )
+    .run(reason, now, id).changes;
+}
+
+// Переводит просроченную заявку в expired, причина 'expired' (PDR §4.4, ONTOLOGY §6).
+export function updateBookingStatusExpired(database: AuthDatabase, id: string, now: number) {
+  return database
+    .prepare(
+      "UPDATE bookings SET status = 'expired', reason = 'expired', version = version + 1, updatedAt = ? WHERE id = ? AND status = 'pending'",
+    )
+    .run(now, id).changes;
+}
+
+// Возвращает идентификаторы pending-заявок, до начала которых осталось меньше deadlineMs.
+// Используется фоновой задачей истечения (PDR §4.4, ONTOLOGY §6).
+export function findOverduePendingBookings(
+  database: AuthDatabase,
+  now: number,
+  deadlineMs: number,
+): { id: string; startUtc: number; expertId: string; guestEmail: string }[] {
+  return database
+    .prepare(
+      "SELECT id, startUtc, expertId, guestEmail FROM bookings WHERE status = 'pending' AND startUtc - ? < ?",
+    )
+    .all(now, deadlineMs) as { id: string; startUtc: number; expertId: string; guestEmail: string }[];
 }
 
 export function insertBookingTransitionFull(
