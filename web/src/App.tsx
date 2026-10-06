@@ -1,4 +1,5 @@
 import { Component, useEffect, useId, useState, type ReactNode } from 'react';
+import { PublicExpertPage } from './expert/PublicExpertPage';
 import { CookieNotice } from './cookie-notice/CookieNotice';
 import { ConsentBlock } from './consent/ConsentBlock';
 import { PrivacyGate, usePrivacyDocument } from './usePrivacyDocument';
@@ -26,6 +27,7 @@ type Route =
   | { name: 'cabinet' }
   | { name: 'profile' }
   | { name: 'signedOut' }
+  | { name: 'expert'; publicId: string }
   | { name: 'notFound' };
 
 function getRoute(pathname: string): Route {
@@ -34,6 +36,10 @@ function getRoute(pathname: string): Route {
   if (path === '/login') return { name: 'login' };
   if (path === '/cabinet') return { name: 'cabinet' };
   if (path === '/cabinet/profile') return { name: 'profile' };
+  const expertMatch = /^\/experts\/([^/]+)$/.exec(path);
+  if (expertMatch && expertMatch[1]) {
+    return { name: 'expert', publicId: expertMatch[1] };
+  }
   return { name: 'notFound' };
 }
 
@@ -289,6 +295,7 @@ export function App() {
           {route.name === 'home' && <HomePage />}
           {route.name === 'login' && <LoginPage />}
           {route.name === 'cabinet' && <CabinetPage />}
+          {route.name === 'expert' && <PublicExpertPage publicId={route.publicId} />}
           {route.name === 'profile' && <ProfilePage />}
           {route.name === 'notFound' && <NotFoundPage />}
         </main>
