@@ -29,6 +29,8 @@ const expectedOperations = new Map([
   ['/api/v1/bookings/{bookingId}/reject', ['post']],
   ['/api/v1/bookings/{bookingId}/withdraw', ['post']],
   ['/api/v1/bookings/{bookingId}/cancel', ['post']],
+  ['/api/v1/events', ['get']],
+  ['/api/v1/bookings/{bookingId}/events', ['get']],
 ]);
 
 function readArtifact() {

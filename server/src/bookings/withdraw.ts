@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { createExpertAuth } from '../auth/expert-auth.js';
 import type { createGuestAuth } from '../auth/guest-auth.js';
+import type { Broadcaster } from '../updates/broadcaster.js';
 import {
   enqueueJob,
   findBooking,
@@ -26,11 +27,7 @@ const bodySchema = z
   .strict();
 
 type Failure =
-  | 'invalid_input'
-  | 'not_found'
-  | 'idempotency_conflict'
-  | 'status_conflict'
-  | 'deadline_exceeded';
+  'invalid_input' | 'not_found' | 'idempotency_conflict' | 'status_conflict' | 'deadline_exceeded';
 
 function publicError(code: Failure | 'forbidden' | 'unauthenticated', message: string) {
   return { code, message };
@@ -93,6 +90,7 @@ export function registerBookingWithdraw(
     guest: ReturnType<typeof createGuestAuth>;
     auth: ReturnType<typeof createExpertAuth>;
     cookieToken: (cookie: string | undefined) => string | undefined;
+    broadcaster?: Broadcaster;
   },
 ) {
   app.post<{ Params: { bookingId: string } }>(
@@ -102,9 +100,7 @@ export function registerBookingWithdraw(
         return reply.code(403).send(publicError('forbidden', 'Недопустимый источник запроса.'));
       const idempotencyKey = idKey.safeParse(request.headers['idempotency-key']);
       if (!idempotencyKey.success) {
-        return reply
-          .code(400)
-          .send(publicError('invalid_input', 'Укажите ключ идемпотентности.'));
+        return reply.code(400).send(publicError('invalid_input', 'Укажите ключ идемпотентности.'));
       }
       const parsedBody = bodySchema.safeParse(request.body ?? {});
       if (!parsedBody.success) {
@@ -212,6 +208,10 @@ export function registerBookingWithdraw(
         };
       });
       if (result.kind === 'replay' || result.kind === 'withdrawn') {
+        if (options.broadcaster) {
+          // Сигнал отправляется только после COMMIT.
+          options.broadcaster.notifyBookingChanged(booking.id);
+        }
         return reply.code(result.status).send(result.value);
       }
       return reply
