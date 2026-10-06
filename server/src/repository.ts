@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import { randomUUID } from 'node:crypto';
 import { initialMigration } from './migrations/001_initial.js';
 import { challengeConsentMigration } from './migrations/002_challenge_consent.js';
 
@@ -240,6 +241,53 @@ export function updateExpertProfile(
     .run(name, timezone, id);
 }
 
+export type WeeklyInterval = { weekday: number; startLocal: string; endLocal: string };
+
+export function readScheduleRows(database: AuthDatabase, expertId: string) {
+  const expert = findExpertById(database, expertId);
+  if (!expert) throw new Error('Unknown schedule owner');
+  const weeklyIntervals = database
+    .prepare(
+      'SELECT weekday,startLocal,endLocal FROM availability_intervals WHERE expertId = ? ORDER BY weekday,startLocal,endLocal',
+    )
+    .all(expertId) as WeeklyInterval[];
+  const dates = database
+    .prepare('SELECT localDate FROM excluded_dates WHERE expertId = ? ORDER BY localDate')
+    .all(expertId) as { localDate: string }[];
+  return {
+    timezone: expert.timezone,
+    weeklyIntervals,
+    excludedDates: dates.map((row) => row.localDate),
+  };
+}
+
+export function replaceScheduleRows(
+  database: AuthDatabase,
+  expertId: string,
+  weeklyIntervals: WeeklyInterval[],
+  excludedDates: string[],
+) {
+  immediate(database, () => {
+    if (!findExpertById(database, expertId)) throw new Error('Unknown schedule owner');
+    database.prepare('DELETE FROM availability_intervals WHERE expertId = ?').run(expertId);
+    database.prepare('DELETE FROM excluded_dates WHERE expertId = ?').run(expertId);
+    const insertInterval = database.prepare(
+      'INSERT INTO availability_intervals (id,expertId,weekday,startLocal,endLocal) VALUES (?,?,?,?,?)',
+    );
+    const insertDate = database.prepare(
+      'INSERT INTO excluded_dates (id,expertId,localDate) VALUES (?,?,?)',
+    );
+    for (const interval of weeklyIntervals) {
+      insertInterval.run(
+        randomUUID(),
+        expertId,
+        interval.weekday,
+        interval.startLocal,
+        interval.endLocal,
+      );
+    }
+    for (const date of excludedDates) insertDate.run(randomUUID(), expertId, date);
+  });
 export type GuestChallengeRow = ChallengeRow & {
   expertId: string | null;
   bookingId: string | null;

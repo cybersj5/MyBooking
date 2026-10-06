@@ -1,5 +1,6 @@
 import Fastify from 'fastify';
 import { z } from 'zod';
+import { readAvailability } from '../availability/index.js';
 import { createGuestAuth } from './guest-auth.js';
 import { registerBookingRead } from '../bookings/read.js';
 import {
@@ -98,6 +99,15 @@ export async function createExpertAuthApp(options: ExpertAuthOptions) {
     const current = auth.currentSession(cookieToken(request.headers.cookie));
     if (!current) return reply.code(401).send(publicError('unauthenticated', 'Требуется вход.'));
     return reply.send(auth.getProfile(current.expert, current.csrfToken));
+  });
+
+  app.get('/api/v1/me/availability', async (request, reply) => {
+    const current = auth.currentSession(cookieToken(request.headers.cookie));
+    if (!current) return reply.code(401).send(publicError('unauthenticated', 'Требуется вход.'));
+    if (current.expert.name === null || current.expert.timezone === null) {
+      return reply.code(403).send(publicError('profile_incomplete', 'Завершите профиль.'));
+    }
+    return reply.send(readAvailability(options.database, current.expert.id));
   });
 
   app.put('/api/v1/me/profile', async (request, reply) => {
