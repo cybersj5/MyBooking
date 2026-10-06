@@ -1,9 +1,14 @@
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
+import { AuthProvider } from './auth/AuthContext';
 import './styles.css';
 
 const root = document.getElementById('root');
 
 if (root) {
-  createRoot(root).render(<App />);
+  createRoot(root).render(
+    <AuthProvider fetcher={fetch}>
+      <App />
+    </AuthProvider>,
+  );
 }
