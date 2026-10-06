@@ -145,6 +145,7 @@ export function createGuestAuth(options: GuestAuthOptions) {
           id: randomUUID(),
           bookingId: challenge.bookingId,
           tokenHash: digest(hmacSecret, 'guest-access', token),
+          email: challenge.email,
           now: at,
           expiresAt: at + accessLifetime,
         });
@@ -184,6 +185,7 @@ export function createGuestAuth(options: GuestAuthOptions) {
       id: randomUUID(),
       bookingId,
       tokenHash: digest(hmacSecret, 'guest-access', token),
+      email: booking.guestEmail,
       now: at,
       expiresAt: at + accessLifetime,
     });

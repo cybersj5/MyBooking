@@ -9,9 +9,13 @@ import {
   readScheduleRows,
 } from '../repository.js';
 import { createGuestAuth } from './guest-auth.js';
+import { registerBookingCancel } from '../bookings/cancel.js';
 import { registerBookingConfirm } from '../bookings/confirm.js';
 import { registerBookingCreate } from '../bookings/create.js';
+import { registerBookingExpire } from '../bookings/expire.js';
 import { registerBookingRead } from '../bookings/read.js';
+import { registerBookingReject } from '../bookings/reject.js';
+import { registerBookingWithdraw } from '../bookings/withdraw.js';
 import { registerPrivacyRoutes, type PrivacyOptions } from '../privacy/index.js';
 import {
   createExpertAuth,
@@ -340,6 +344,37 @@ export async function createExpertAuthApp(
     allowedOrigin: options.allowedOrigin,
     auth,
     cookieToken,
+  });
+  registerBookingReject(app, {
+    database: options.database,
+    now: options.now,
+    allowedOrigin: options.allowedOrigin,
+    auth,
+    cookieToken,
+  });
+  registerBookingWithdraw(app, {
+    database: options.database,
+    now: options.now,
+    allowedOrigin: options.allowedOrigin,
+    hmacSecret: options.hmacSecret,
+    guest,
+    auth,
+    cookieToken,
+  });
+  registerBookingCancel(app, {
+    database: options.database,
+    now: options.now,
+    allowedOrigin: options.allowedOrigin,
+    hmacSecret: options.hmacSecret,
+    auth,
+    guest,
+    cookieToken,
+  });
+  registerBookingExpire(app, {
+    database: options.database,
+    now: options.now,
+    allowedOrigin: options.allowedOrigin,
+    systemApiKey: options.systemApiKey ?? '',
   });
 
   return app;
