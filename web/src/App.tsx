@@ -1,4 +1,5 @@
 import { Component, useEffect, useId, useState, type ReactNode } from 'react';
+import { PublicExpertPage } from './expert/PublicExpertPage';
 import { CookieNotice } from './cookie-notice/CookieNotice';
 import { ConsentBlock } from './consent/ConsentBlock';
 import { PrivacyGate, usePrivacyDocument } from './usePrivacyDocument';
@@ -16,11 +17,21 @@ function getInitialTheme(): Theme {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
-function getRoute(pathname: string): 'home' | 'cabinet' | 'notFound' {
+type Route =
+  | { name: 'home' }
+  | { name: 'cabinet' }
+  | { name: 'expert'; publicId: string }
+  | { name: 'notFound' };
+
+function getRoute(pathname: string): Route {
   const path = pathname.replace(/\/+$/, '') || '/';
-  if (path === '/') return 'home';
-  if (path === '/cabinet') return 'cabinet';
-  return 'notFound';
+  if (path === '/') return { name: 'home' };
+  if (path === '/cabinet') return { name: 'cabinet' };
+  const expertMatch = /^\/experts\/([^/]+)$/.exec(path);
+  if (expertMatch && expertMatch[1]) {
+    return { name: 'expert', publicId: expertMatch[1] };
+  }
+  return { name: 'notFound' };
 }
 
 export function LoadingState({ message = 'Загрузка данных…' }: { message?: string }) {
@@ -161,7 +172,7 @@ export function App() {
             </a>
             <div className="header-actions">
               <nav aria-label="Основная навигация">
-                <a href="/cabinet" aria-current={route === 'cabinet' ? 'page' : undefined}>
+                <a href="/cabinet" aria-current={route.name === 'cabinet' ? 'page' : undefined}>
                   Кабинет
                 </a>
               </nav>
@@ -170,9 +181,10 @@ export function App() {
           </div>
         </header>
         <main id="main" className="content" tabIndex={-1}>
-          {route === 'home' && <HomePage />}
-          {route === 'cabinet' && <CabinetPage />}
-          {route === 'notFound' && <NotFoundPage />}
+          {route.name === 'home' && <HomePage />}
+          {route.name === 'cabinet' && <CabinetPage />}
+          {route.name === 'expert' && <PublicExpertPage publicId={route.publicId} />}
+          {route.name === 'notFound' && <NotFoundPage />}
         </main>
         <GlobalPrivacySurface />
       </div>
