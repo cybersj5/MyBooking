@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { LoadingState } from '../App';
+import { GuestEmailFlow } from '../guest/GuestEmailFlow';
 import { listExpertSlots, type DurationMinutes, type Slot, type SlotsResponse } from './api';
 import {
   addDaysLocalDate,
@@ -96,6 +97,17 @@ export function PublicExpertPage({ publicId }: PublicExpertPageProps) {
   }, [publicId, range.from, range.to, duration, reloadToken]);
 
   const expertTimezone = load.kind === 'success' ? load.data.timezone : null;
+
+  // Сводка выбранного слота: дата и время в поясе гостя. Слот выбирается из последнего
+  // успешного ответа — этого достаточно, чтобы сбросить состояние гостевого потока.
+  const selectedSlotLabel = useMemo<string | null>(() => {
+    if (load.kind !== 'success' || selectedSlotKey === null) return null;
+    const slot = load.data.slots.find((entry) => entry.startAt === selectedSlotKey);
+    if (!slot) return null;
+    const { epochMs } = parseStartAt(slot.startAt);
+    const formatted = formatInTimezone(epochMs, guestTimezone);
+    return `${formatted.date}, ${formatted.time} (${formatted.timezone})`;
+  }, [load, selectedSlotKey, guestTimezone]);
 
   return (
     <div className="page-content expert-page">
@@ -200,6 +212,13 @@ export function PublicExpertPage({ publicId }: PublicExpertPageProps) {
           />
         )}
       </section>
+      {selectedSlotLabel !== null ? (
+        <GuestEmailFlow
+          publicId={publicId}
+          slotKey={selectedSlotKey ?? ''}
+          slotLabel={selectedSlotLabel}
+        />
+      ) : null}
     </div>
   );
 }

@@ -10,10 +10,14 @@ export type ConsentSubmission = {
 export function ConsentBlock({
   document,
   actionLabel = 'Запросить код',
+  submitDisabled = false,
   onSubmit,
 }: {
   document: PrivacyDocument;
   actionLabel?: string;
+  // Дополнительная блокировка кнопки поверх галочки (например, при ошибке 429/503
+  // в гостевом потоке). Не отключает саму галочку согласия.
+  submitDisabled?: boolean;
   onSubmit?: (consent: ConsentSubmission) => void;
 }): ReactNode {
   const checkboxId = useId();
@@ -54,7 +58,7 @@ export function ConsentBlock({
         <button
           className="button"
           type="button"
-          disabled={!accepted}
+          disabled={submitDisabled || !accepted}
           aria-label={actionLabel}
           onClick={handleSubmit}
         >
