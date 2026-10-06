@@ -1,6 +1,13 @@
 import Fastify from 'fastify';
+import { Temporal } from '@js-temporal/polyfill';
 import { z } from 'zod';
 import { readAvailability } from '../availability/index.js';
+import { calculatePublicSlots } from '../availability/public-slots.js';
+import {
+  findExpertByPublicId,
+  readConfirmedBusyIntervals,
+  readScheduleRows,
+} from '../repository.js';
 import { createGuestAuth } from './guest-auth.js';
 import { registerBookingRead } from '../bookings/read.js';
 import {
@@ -26,6 +33,28 @@ const profileSchema = z.object({
 
 function publicError(code: string, message: string) {
   return { code, message };
+}
+
+function validSlotRange(query: {
+  from?: string;
+  to?: string;
+}): query is { from: string; to: string } {
+  const { from, to } = query;
+  if (
+    typeof from !== 'string' ||
+    typeof to !== 'string' ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(from) ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(to)
+  )
+    return false;
+  try {
+    const first = Temporal.PlainDate.from(from, { overflow: 'reject' });
+    const last = Temporal.PlainDate.from(to, { overflow: 'reject' });
+    const days = first.until(last).days;
+    return days > 0 && days <= 31;
+  } catch {
+    return false;
+  }
 }
 
 function cookieToken(cookie: string | undefined) {
@@ -108,6 +137,34 @@ export async function createExpertAuthApp(options: ExpertAuthOptions) {
       return reply.code(403).send(publicError('profile_incomplete', 'Завершите профиль.'));
     }
     return reply.send(readAvailability(options.database, current.expert.id));
+  });
+
+  app.get<{
+    Params: { publicId: string };
+    Querystring: { from?: string; to?: string; durationMinutes?: string };
+  }>('/api/v1/experts/:publicId/slots', async (request, reply) => {
+    const expert = findExpertByPublicId(options.database, request.params.publicId);
+    if (!expert || !expert.timezone || !expert.name)
+      return reply.code(404).send(publicError('not_found', 'Не найдено.'));
+    const { durationMinutes } = request.query;
+    if (
+      !validSlotRange(request.query) ||
+      (durationMinutes !== '15' && durationMinutes !== '30' && durationMinutes !== '60')
+    )
+      return reply.code(400).send(publicError('invalid_input', 'Проверьте параметры запроса.'));
+    const { from, to } = request.query;
+    const schedule = readScheduleRows(options.database, expert.id);
+    const slots = calculatePublicSlots({
+      timezone: expert.timezone,
+      weeklyIntervals: schedule.weeklyIntervals,
+      excludedDates: schedule.excludedDates,
+      from,
+      to,
+      durationMinutes: Number(durationMinutes) as 15 | 30 | 60,
+      nowMs: options.now(),
+      busyIntervals: readConfirmedBusyIntervals(options.database, expert.id, expert.email),
+    });
+    return reply.send({ timezone: expert.timezone, slots });
   });
 
   app.put('/api/v1/me/profile', async (request, reply) => {

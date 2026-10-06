@@ -288,6 +288,8 @@ export function replaceScheduleRows(
     }
     for (const date of excludedDates) insertDate.run(randomUUID(), expertId, date);
   });
+}
+
 export type GuestChallengeRow = ChallengeRow & {
   expertId: string | null;
   bookingId: string | null;
@@ -300,6 +302,18 @@ export function findExpertByPublicId(
   return database
     .prepare('SELECT id,email,publicId,name,timezone FROM experts WHERE publicId = ?')
     .get(publicId) as ExpertRow | undefined;
+}
+
+export function readConfirmedBusyIntervals(
+  database: AuthDatabase,
+  expertId: string,
+  expertEmail: string,
+): { startAtMs: number; endAtMs: number }[] {
+  return database
+    .prepare(
+      "SELECT startUtc AS startAtMs,endUtc AS endAtMs FROM bookings WHERE status = 'confirmed' AND (expertId = ? OR guestEmail = ?)",
+    )
+    .all(expertId, expertEmail) as { startAtMs: number; endAtMs: number }[];
 }
 
 export function guestChallengeLimits(
