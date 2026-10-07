@@ -30,7 +30,11 @@ export type ExpertAuthOptions = {
   sendCode: (message: { to: string; code: string }) => Promise<void>;
   now: () => number;
   hmacSecret: string;
+  // Разрешённый Origin для проверки CORS и CSRF.
   allowedOrigin: string;
+  // Расширенный список разрешённых Origin. Если задан, проверка вхождения
+  // request.headers.origin в этот список имеет приоритет над allowedOrigin.
+  allowedOrigins?: string[];
   consentVersion: string;
   secureCookies?: boolean;
   // Ключ для системного обработчика истечения заявок (POST .../expire).
@@ -38,6 +42,16 @@ export type ExpertAuthOptions = {
   // всегда отвечает 401.
   systemApiKey?: string;
 };
+
+export function originAllowedBy(
+  origin: string | undefined,
+  options: Pick<ExpertAuthOptions, 'allowedOrigin' | 'allowedOrigins'>,
+): boolean {
+  if (options.allowedOrigins && options.allowedOrigins.length > 0) {
+    return origin !== undefined && options.allowedOrigins.includes(origin);
+  }
+  return origin === options.allowedOrigin;
+}
 
 export type AuthFailure =
   'consent_outdated' | 'rate_limited' | 'mail_unavailable' | 'invalid_challenge';

@@ -23,6 +23,7 @@ import { registerPrivacyRoutes, type PrivacyOptions } from '../privacy/index.js'
 import {
   createExpertAuth,
   expertSessionMaxAgeSeconds,
+  originAllowedBy,
   type ExpertAuthOptions,
 } from './expert-auth.js';
 
@@ -90,7 +91,10 @@ export async function createExpertAuthApp(
   const broadcaster = createBroadcaster(options.database, options.now);
 
   function originAllowed(origin: string | undefined) {
-    return origin === options.allowedOrigin;
+    if (options.allowedOrigins !== undefined && options.allowedOrigins.length > 0) {
+      return originAllowedBy(origin, { allowedOrigin: options.allowedOrigin, allowedOrigins: options.allowedOrigins });
+    }
+    return originAllowedBy(origin, { allowedOrigin: options.allowedOrigin });
   }
 
   app.post('/api/v1/auth/expert/challenges', async (request, reply) => {
